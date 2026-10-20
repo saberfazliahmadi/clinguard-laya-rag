@@ -29,9 +29,13 @@ jobs:
 
       - name: Run unit and integration test suite
         run: |
-          pytest -v
+          python -m pytest -v
+        env:
+          PYTHONPATH: src:.
 
       - name: Verify reproducible ablation benchmark & CLI audit output
         run: |
           python scripts/run_evaluation.py
           python scripts/demo_cli.py --case-id EVAL-03 --mode clinguard_full
+        env:
+          PYTHONPATH: src:.
