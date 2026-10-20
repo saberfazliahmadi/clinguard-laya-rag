@@ -1,0 +1,92 @@
+[
+  {
+    "doc_id": "KDIGO-2024-MET-01",
+    "title": "KDIGO CKD & Diabetes Guideline: Metformin Dosing by eGFR",
+    "source_org": "KDIGO",
+    "publication_year": 2024,
+    "domain": "renal_dosing_contraindications",
+    "text": "In patients with type 2 diabetes and chronic kidney disease, metformin is recommended when eGFR is >= 45 mL/min/1.73m2 without dose adjustment. When eGFR is 30 to 44 mL/min/1.73m2, halve the maximum daily dose to 1000 mg/day and monitor renal function every 3 to 6 months. Discontinue metformin if eGFR falls below 30 mL/min/1.73m2 due to risk of metformin-associated lactic acidosis.",
+    "clinical_keywords": ["metformin", "egfr", "30", "45", "1000 mg", "discontinue", "lactic acidosis", "ckd"]
+  },
+  {
+    "doc_id": "HARDNEG-MET-HEP-02",
+    "title": "Hepatic Contraindications and Tissue Hypoxia for Biguanide Therapy",
+    "source_org": "Clinical Pharmacology Summary",
+    "publication_year": 2023,
+    "domain": "endocrine_diabetes",
+    "text": "Metformin is contraindicated in patients with decompensated hepatic cirrhosis, acute heart failure with hypoperfusion, or severe alcohol abuse because impaired hepatic lactate clearance predisposes to lactic acidosis even when serum creatinine appears normal.",
+    "clinical_keywords": ["metformin", "hepatic", "cirrhosis", "lactate", "lactic acidosis", "heart failure"]
+  },
+  {
+    "doc_id": "WHO-AWARE-CAP-01",
+    "title": "WHO AWaRe Antibiotic Book: Mild-to-Moderate Adult Community-Acquired Pneumonia",
+    "source_org": "World Health Organization",
+    "publication_year": 2023,
+    "domain": "antimicrobial_stewardship",
+    "text": "For outpatient adults with mild-to-moderate community-acquired pneumonia (CAP) and no comorbidities, first-line Access antibiotic therapy is oral amoxicillin 1 g three times daily for 5 days. Doxycycline 100 mg twice daily for 5 days is an alternative in penicillin-allergic patients without severe hypersensitivity.",
+    "clinical_keywords": ["amoxicillin", "1 g", "three times daily", "5 days", "pneumonia", "cap", "doxycycline", "adult"]
+  },
+  {
+    "doc_id": "HARDNEG-PED-CAP-02",
+    "title": "WHO AWaRe Antibiotic Book: Pediatric Non-Severe Pneumonia Dosing",
+    "source_org": "World Health Organization",
+    "publication_year": 2023,
+    "domain": "antimicrobial_stewardship",
+    "text": "For children aged 2 months to 5 years with fast-breathing pneumonia and no danger signs, administer oral dispersible amoxicillin at 40 mg/kg/dose twice daily (80 mg/kg/day total) for 5 days.",
+    "clinical_keywords": ["amoxicillin", "40 mg/kg", "children", "pediatric", "pneumonia", "5 days"]
+  },
+  {
+    "doc_id": "AHA-HTN-2023-BP01",
+    "title": "AHA/ACC Hypertension Guideline: Blood Pressure Targets and First-Line Classes",
+    "source_org": "AHA/ACC",
+    "publication_year": 2023,
+    "domain": "cardiovascular_hypertension",
+    "text": "For adults with confirmed hypertension and known cardiovascular disease or 10-year ASCVD risk >= 10%, a blood pressure target of < 130/80 mmHg is recommended. First-line pharmacologic agents include thiazide diuretics (chlorthalidone), ACE inhibitors, angiotensin receptor blockers (ARBs), and dihydropyridine calcium channel blockers (amlodipine). Do not combine ACE inhibitors with ARBs.",
+    "clinical_keywords": ["hypertension", "130/80", "mmhg", "ace inhibitor", "arb", "amlodipine", "chlorthalidone"]
+  },
+  {
+    "doc_id": "ESC-HTN-2024-ELDERLY",
+    "title": "ESC Hypertension Consensus: Frail Octogenarians Target Range",
+    "source_org": "European Society of Cardiology",
+    "publication_year": 2024,
+    "domain": "cardiovascular_hypertension",
+    "text": "In frail patients aged >= 80 years with isolated systolic hypertension, office systolic blood pressure should initially be targeted to 140 to 150 mmHg, lowering below 140 mmHg only if well tolerated without orthostatic hypotension.",
+    "clinical_keywords": ["hypertension", "140 to 150", "mmhg", "frail", "80 years", "elderly", "orthostatic"]
+  },
+  {
+    "doc_id": "ADA-2025-SGLT2-HF",
+    "title": "ADA Standards of Care: SGLT2 Inhibitors in Type 2 Diabetes and Heart Failure",
+    "source_org": "American Diabetes Association",
+    "publication_year": 2025,
+    "domain": "endocrine_diabetes",
+    "text": "In adults with type 2 diabetes and established heart failure (with either reduced or preserved ejection fraction), an SGLT2 inhibitor with proven heart failure benefit (dapagliflozin 10 mg daily or empagliflozin 10 mg daily) is recommended independent of baseline HbA1c or background metformin use, provided eGFR is >= 20 mL/min/1.73m2.",
+    "clinical_keywords": ["sglt2", "dapagliflozin", "empagliflozin", "10 mg", "heart failure", "egfr", "20", "hba1c"]
+  },
+  {
+    "doc_id": "FDA-LEGACY-SGLT2-2019",
+    "title": "Legacy Glycemic Labeling for Dapagliflozin Initiation in CKD",
+    "source_org": "Legacy Monograph Archive",
+    "publication_year": 2019,
+    "domain": "renal_dosing_contraindications",
+    "text": "For strictly glycemic lowering in type 2 diabetes without cardiovascular or renal protection indications, initiation of dapagliflozin was historically not recommended when eGFR is below 45 mL/min/1.73m2 because glucosuric efficacy diminishes as glomerular filtration declines.",
+    "clinical_keywords": ["sglt2", "dapagliflozin", "egfr", "45", "glycemic", "initiation", "ckd"]
+  },
+  {
+    "doc_id": "RENAL-APX-2024-01",
+    "title": "Renal & Age Dose Reduction Criteria for Apixaban in Nonvalvular Atrial Fibrillation",
+    "source_org": "Anticoagulation Stewardship Forum",
+    "publication_year": 2024,
+    "domain": "renal_dosing_contraindications",
+    "text": "The standard apixaban dose for stroke prevention in nonvalvular atrial fibrillation is 5 mg orally twice daily. Reduce the dose to 2.5 mg twice daily only if the patient meets at least two of the following three criteria: age >= 80 years, body weight <= 60 kg, or serum creatinine >= 1.5 mg/dL.",
+    "clinical_keywords": ["apixaban", "5 mg", "2.5 mg", "twice daily", "80 years", "60 kg", "creatinine", "1.5"]
+  },
+  {
+    "doc_id": "WHO-AWARE-UTI-01",
+    "title": "WHO AWaRe Antibiotic Book: Uncomplicated Lower Urinary Tract Infection",
+    "source_org": "World Health Organization",
+    "publication_year": 2023,
+    "domain": "antimicrobial_stewardship",
+    "text": "For non-pregnant adult women with uncomplicated acute cystitis, first-line therapy is oral nitrofurantoin 100 mg twice daily for 5 days. Avoid nitrofurantoin in patients with eGFR < 30 mL/min/1.73m2 or when pyelonephritis is suspected because renal parenchymal and tissue concentrations are inadequate.",
+    "clinical_keywords": ["nitrofurantoin", "100 mg", "5 days", "uti", "cystitis", "egfr", "30", "pyelonephritis"]
+  }
+]

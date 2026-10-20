@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging & build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Pytest & coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Model checkpoints & Hugging Face caches (keep repo lightweight)
+*.safetensors
+*.onnx
+.cache/
+hf_cache/
+
+# Environment variables & API keys (never commit secrets)
+.env
+.env.*
