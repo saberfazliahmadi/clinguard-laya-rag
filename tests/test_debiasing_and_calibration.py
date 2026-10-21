@@ -1,4 +1,4 @@
-"""Unit tests for token budget math, bidirectional debiasing, temperature calibration, and PHI scrubbing."""
+﻿"""Unit tests for token budget math, bidirectional debiasing, temperature calibration, and PHI scrubbing."""
 
 from __future__ import annotations
 import json
@@ -70,15 +70,15 @@ def test_temperature_calibrator_fits_and_reduces_nll_and_overconfidence() -> Non
 
 def test_phi_redaction_and_question_dict_normalization() -> None:
     sample = (
-        "Contact Dr. Jane at jane.doe@hospital.org or +49 40 12345678; "
-        "MRN: 00481923, DOB: 1961-04-03; eGFR trend 120 130 1500."
+        "Contact Dr. Jane at jane.doe@hospital.org or +49 40 1234 5678; "
+        "MRN: 00481923, DOB: 1961-04-03; eGFR trend 85, 90, 95."
     )
     scrubbed = redact_phi_hook(sample)
     assert "[REDACTED_EMAIL]" in scrubbed
     assert "[REDACTED_PHONE]" in scrubbed
     assert "[REDACTED_MRN]" in scrubbed
     assert "[REDACTED_DOB]" in scrubbed
-    assert "120 130 1500" in scrubbed
+    assert "85, 90, 95" in scrubbed
 
     q_list = [
         {"id": "q1", "type": "choice", "question": "Pick one", "options": ["a", "b"]},
