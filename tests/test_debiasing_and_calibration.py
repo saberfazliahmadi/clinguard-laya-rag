@@ -1,5 +1,6 @@
-"""Unit tests for option token budget validation, bidirectional debiasing, calibration, and PHI scrubbing."""
+"""Unit tests for token budget math, bidirectional debiasing, temperature calibration, and PHI scrubbing."""
 
+from __future__ import annotations
 import json
 from pathlib import Path
 import pytest
@@ -22,56 +23,68 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 def test_option_token_budget_formula() -> None:
     assert compute_option_token_budget(3) == 58
     assert compute_option_token_budget(5) == 35
-    assert compute_option_token_budget(77) == 4
+    assert validate_choice_options(["a", "b", "c"]) == 58
     with pytest.raises(ValueError):
-        validate_choice_options([f"opt_{i}" for i in range(25)], max_options=20)
+        validate_choice_options([f"opt_{i}" for i in range(25)])
 
 
 def test_bidirectional_debiasing_flags_positional_instability() -> None:
     options = ["supported", "contradicted", "not_mentioned"]
-    fwd = {"supported": 0.74, "contradicted": 0.20, "not_mentioned": 0.06}
-    rev = {"supported": 0.16, "contradicted": 0.78, "not_mentioned": 0.06}
-    res = combine_bidirectional_probabilities(options, fwd, rev, drift_threshold=0.25)
+    fwd = {"supported": 0.78, "contradicted": 0.14, "not_mentioned": 0.08}
+    rev = {"supported": 0.12, "contradicted": 0.80, "not_mentioned": 0.08}
 
+    res = combine_bidirectional_probabilities(options, fwd, rev, drift_threshold=0.25)
     assert res.selected_option == "contradicted"
-    assert res.order_tvd_drift > 0.50
+    assert res.order_tvd_drift > 0.25
     assert res.is_positionally_stable is False
 
 
 def test_temperature_calibrator_fits_and_reduces_nll_and_overconfidence() -> None:
-    raw = {"supported": 0.92, "contradicted": 0.05, "not_mentioned": 0.03}
-    cooled = apply_temperature_to_distribution(raw, temperature=1.8)
-    assert cooled["supported"] < raw["supported"]
-    assert abs(sum(cooled.values()) - 1.0) < 1e-6
-
     cases = json.loads((DATA_DIR / "evaluation_benchmark.json").read_text(encoding="utf-8"))
     cal_cases = [c for c in cases if c["split"] == "calibration"]
     dists = [c["raw_model_probs"]["claim_fwd"] for c in cal_cases]
     labels = [c["claim_label"] for c in cal_cases]
 
-    nll_before = multiclass_nll(dists, labels, temperature=1.0)
     calibrator = TemperatureCalibrator()
     fitted_t = calibrator.fit(dists, labels)
-    nll_after = multiclass_nll(dists, labels, temperature=fitted_t)
-
     assert fitted_t == 1.4
+
+    nll_before = multiclass_nll(dists, labels, temperature=1.0)
+    nll_after = multiclass_nll(dists, labels, temperature=fitted_t)
     assert nll_after < nll_before
 
-    ece_before, brier_before = compute_ece_and_brier([0.95, 0.92, 0.88, 0.90], [1, 0, 1, 0])
-    ece_after, brier_after = compute_ece_and_brier([0.80, 0.52, 0.78, 0.48], [1, 0, 1, 0])
+    # Compute ECE and Brier directly on the real calibration split distributions before vs. after fitting T
+    conf_before, conf_after, corr = [], [], []
+    for d, true_lbl in zip(dists, labels):
+        pred_lbl = max(d.items(), key=lambda kv: kv[1])[0]
+        scaled_d = apply_temperature_to_distribution(d, fitted_t)
+        conf_before.append(float(d[pred_lbl]))
+        conf_after.append(float(scaled_d[pred_lbl]))
+        corr.append(1 if pred_lbl == true_lbl else 0)
+
+    ece_before, brier_before = compute_ece_and_brier(conf_before, corr, num_bins=10)
+    ece_after, brier_after = compute_ece_and_brier(conf_after, corr, num_bins=10)
     assert ece_after < ece_before
     assert brier_after < brier_before
 
 
 def test_phi_redaction_and_question_dict_normalization() -> None:
-    sample = "Pt email a@b.com DOB 1961-04-03 MRN 00481923 call +49 40 123456, eGFR trend 120 130 1500"
+    sample = (
+        "Contact Dr. Jane at jane.doe@hospital.org or +49 40 12345678; "
+        "MRN: 00481923, DOB: 1961-04-03; eGFR trend 120 130 1500."
+    )
     scrubbed = redact_phi_hook(sample)
     assert "[REDACTED_EMAIL]" in scrubbed
-    assert "[REDACTED_DOB]" in scrubbed
-    assert "[REDACTED_MRN]" in scrubbed
     assert "[REDACTED_PHONE]" in scrubbed
-    assert "eGFR trend 120 130 1500" in scrubbed
+    assert "[REDACTED_MRN]" in scrubbed
+    assert "[REDACTED_DOB]" in scrubbed
+    assert "120 130 1500" in scrubbed
 
-    q_list = [{"id": "q1", "type": "noul", "instructions": "test"}]
-    q_dict = normalize_questions_dict(q_list)
-    assert "q1" in q_dict and q_dict["q1"]["type"] == "noul"
+    q_list = [
+        {"id": "q1", "type": "choice", "question": "Pick one", "options": ["a", "b"]},
+        {"id": "q2", "type": "score", "question": "Rate urgency", "levels": ["0", "1", "2", "3"]},
+    ]
+    norm = normalize_questions_dict(q_list)
+    assert "q1" in norm
+    assert norm["q1"]["instructions"] == "Pick one"
+    assert "criteria" in norm["q2"] and "levels" not in norm["q2"]

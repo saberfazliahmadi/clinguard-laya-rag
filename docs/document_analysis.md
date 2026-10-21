@@ -1,4 +1,4 @@
-﻿# Phase 1: Document Analysis â€” Laya, Jev, and System 1 Decision Models for Healthcare RAG
+# Phase 1: Document Analysis â€” Laya, Jev, and System 1 Decision Models for Healthcare RAG
 
 ## 1. Corpus Overview
 Seven PDF documents were analyzed, representing six unique primary sources published between September 23, 2026, and October 12, 2026 (Documents 3 and 6 are identical copies of Celia Lozano Grijalba's LinkedIn article):

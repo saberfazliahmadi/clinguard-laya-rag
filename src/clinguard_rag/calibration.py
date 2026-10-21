@@ -1,9 +1,10 @@
-"""Post-hoc Temperature Scaling and calibration metrics (ECE, Brier Score, NLL)."""
+"""Post-hoc Temperature Scaling and calibration metrics (ECE, Top-Label Brier Score, NLL)."""
 
 from __future__ import annotations
 import math
 from typing import Dict, List, Optional, Tuple
 import numpy as np
+
 
 def multiclass_nll(dists: List[Dict[str, float]], labels: List[str], temperature: float = 1.0) -> float:
     total_loss = 0.0
@@ -13,6 +14,7 @@ def multiclass_nll(dists: List[Dict[str, float]], labels: List[str], temperature
         prob = max(eps, cooled.get(label, eps))
         total_loss -= math.log(prob)
     return total_loss / max(1, len(dists))
+
 
 def apply_temperature_to_distribution(
     probs: Dict[str, float], temperature: float
@@ -40,7 +42,8 @@ def compute_ece_and_brier(
     confidences: List[float], correctness: List[int], num_bins: int = 10
 ) -> Tuple[float, float]:
     """
-    Computes Expected Calibration Error (ECE) across equal-width bins and Brier Score.
+    Computes Expected Calibration Error (ECE) across equal-width bins and
+    Top-Label Confidence Brier Score: mean((top_confidence - is_correct)^2).
     """
     conf = np.asarray(confidences, dtype=np.float64)
     corr = np.asarray(correctness, dtype=np.float64)

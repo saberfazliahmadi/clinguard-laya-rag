@@ -1,4 +1,4 @@
-﻿# Phase 5: Evaluation & Ablation Report (`ClinGuard-RAG`)
+# Phase 5: Evaluation & Ablation Report (`ClinGuard-RAG`)
 
 ## 1. Benchmark Methodology & Scope
 
