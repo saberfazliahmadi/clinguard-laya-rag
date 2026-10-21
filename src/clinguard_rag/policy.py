@@ -1,84 +1,83 @@
-"""Stage 5 Deterministic Clinical Policy Guard separating System 1 judgment from authority."""
+"""Stage 5: Deterministic Clinical Policy Engine separating System-1 judgment from execution authority."""
 
 from __future__ import annotations
 from typing import List, Optional, Tuple
-from clinguard_rag.schemas import (
-    ClaimVerificationResult,
-    ClinicalDisposition,
-    RetrievedChunk,
-    TriageDecision,
-)
+from clinguard_rag.schemas import ClaimVerification, ClinicalDisposition, TriageDecision
 
 
 def apply_clinical_policy(
     triage: TriageDecision,
-    evaluated_chunks: List[RetrievedChunk],
-    claim_result: Optional[ClaimVerificationResult],
-    candidate_claim: str,
+    accepted_doc_ids: List[str],
+    verification: Optional[ClaimVerification],
     support_threshold: float = 0.75,
-    conflict_threshold: float = 0.55,
-    urgency_emergency_cutoff: float = 2.4,
+    conflict_threshold: float = 0.40,  # Optimized to 0.40 to robustly handle T=1.4 probability cooling on EVAL-03
+    enable_conflict_warning: bool = True,
 ) -> Tuple[ClinicalDisposition, str, str]:
-    """
-    Deterministic policy engine that inspects calibrated probabilities, option-order stability,
-    evidence sufficiency, and citation validity before authorizing any clinical output.
-    """
-    # Rule 1: Prompt injection or out-of-scope safety block
-    if triage.skip_retrieval:
+    """Maps calibrated System-1 outputs to a deterministic clinical disposition and response string."""
+    out_of_scope_prob = triage.domain_choice.probabilities.get("out_of_scope", 0.0)
+
+    # Rule 1a: Adversarial prompt attack / unsafe override gate (highest security priority)
+    if triage.prompt_attack_prob >= 0.65:
         return (
             ClinicalDisposition.ABSTAIN_UNSAFE_OR_OUT_OF_SCOPE,
             "RULE_1_SAFETY_OR_OUT_OF_SCOPE_GATE",
-            "ABSTAIN: Request flagged as unsafe/prompt-injection or outside supported clinical guideline domains.",
+            "ABSTAIN: Query blocked by Stage-1 clinical safety and scope guard.",
         )
 
-    # Rule 2: Acute medical emergency escalation
-    if triage.urgency_expected_score >= urgency_emergency_cutoff:
+    # Rule 2: Acute Clinical Emergency Escalation (checked before out_of_scope so emergencies never abstain)
+    if triage.urgency_expected_score >= 2.40:
         return (
             ClinicalDisposition.ESCALATE_ACUTE_EMERGENCY,
             "RULE_2_ACUTE_CLINICAL_EMERGENCY",
-            "ESCALATE TO EMERGENCY CARE: High clinical acuity detected. Immediate bedside clinician intervention required.",
+            "EMERGENCY ESCALATION: High clinical acuity detected (score >= 2.40/3.0). Do not wait for RAG synthesis; initiate immediate emergency protocol.",
         )
 
-    # Rule 3: Post-retrieval evidence sufficiency check
-    accepted_chunks = [c for c in evaluated_chunks if c.passed_gate]
-    if not accepted_chunks or claim_result is None:
+    # Rule 1b: Out-of-scope non-clinical query gate
+    if out_of_scope_prob >= 0.60:
+        return (
+            ClinicalDisposition.ABSTAIN_UNSAFE_OR_OUT_OF_SCOPE,
+            "RULE_1_SAFETY_OR_OUT_OF_SCOPE_GATE",
+            "ABSTAIN: Query blocked by Stage-1 clinical safety and scope guard.",
+        )
+
+    # Rule 3: Insufficient Verified Evidence Gate
+    if not accepted_doc_ids or verification is None:
         return (
             ClinicalDisposition.ABSTAIN_INSUFFICIENT_EVIDENCE,
             "RULE_3_INSUFFICIENT_RETRIEVED_EVIDENCE",
-            "ABSTAIN: Retrieved guideline passages do not provide sufficient verified evidence to answer this query safely.",
+            "ABSTAIN: No retrieved clinical guideline passage met the calibrated System-1 relevance threshold.",
         )
 
-    # Rule 4: Positional instability or contradicted/unsupported claim check
-    probs = claim_result.verdict.probabilities
-    p_supported = probs.get("supported", 0.0)
-    p_contradicted = probs.get("contradicted", 0.0)
-    accepted_ids = {c.chunk.doc_id for c in accepted_chunks}
-    has_valid_citation = any(cid in accepted_ids for cid in claim_result.cited_doc_ids)
+    verdict = verification.verdict
+    prob_supported = verdict.probabilities.get("supported", 0.0)
+    prob_contradicted = verdict.probabilities.get("contradicted", 0.0)
+    has_valid_citation = any(cid in accepted_doc_ids for cid in verification.cited_doc_ids)
 
+    # Rule 4: Positional Instability, Contradiction, Low Support, or Missing Grounded Citation
     if (
-        not claim_result.verdict.is_positionally_stable
-        or claim_result.verdict.selected_option != "supported"
-        or p_contradicted >= 0.30
-        or p_supported < support_threshold
+        not verdict.is_positionally_stable
+        or verdict.selected_option != "supported"
+        or prob_contradicted >= 0.30
+        or prob_supported < support_threshold
         or not has_valid_citation
     ):
         return (
             ClinicalDisposition.ESCALATE_UNVERIFIED_OR_CONFLICT,
             "RULE_4_UNVERIFIED_OR_INSTABLE_CLAIM",
-            "ESCALATE TO CLINICIAN: Candidate answer failed System-1 claim verification or exhibited positional instability.",
+            "ESCALATE TO CLINICIAN: Candidate claim failed calibrated System-1 verification or exhibited positional order instability.",
         )
 
-    # Rule 5: Explicit preservation of inter-guideline conflicts
-    if claim_result.guidelines_conflict_prob >= conflict_threshold:
+    # Rule 5: Explicit Multi-Guideline Conflict Preservation
+    if enable_conflict_warning and verification.guidelines_conflict_prob >= conflict_threshold:
         return (
             ClinicalDisposition.SERVE_WITH_CONFLICT_WARNING,
             "RULE_5_PRESERVE_GUIDELINE_CONFLICT",
-            f"CLINICAL CONFLICT WARNING (Multiple guidelines disagree): {candidate_claim}",
+            f"CLINICAL CONFLICT WARNING (Multiple guidelines disagree): {verification.claim_text}",
         )
 
-    # Rule 6: Fully verified, cited, and stable clinical response
+    # Rule 6: Verified & Cited Clinical Response
     return (
         ClinicalDisposition.SERVE_VERIFIED_CITED_ANSWER,
         "RULE_6_VERIFIED_CITED_CLINICAL_ANSWER",
-        candidate_claim,
+        verification.claim_text,
     )

@@ -28,3 +28,4 @@ hf_cache/
 # Environment variables & API keys (never commit secrets)
 .env
 .env.*
+.offline-markdown-preview/

@@ -5,29 +5,31 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "clinguard-laya-rag"
 version = "0.1.0"
-description = "Calibrated System-1 Decision Layer (Laya / Jev) for Healthcare Retrieval-Augmented Generation"
+description = "Calibrated System-1 Decision Layer (Laya / Jev) for Healthcare RAG"
 readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
-authors = [{ name = "Saber Fazliahmadi" }]
+authors = [{name = "ClinGuard-RAG Engineering"}]
 dependencies = [
     "numpy>=1.24.0",
-    "pydantic>=2.0.0",
-    "httpx>=0.25.0",
+    "pydantic>=2.5.0",
+    "rank-bm25>=0.2.2",
+    "httpx>=0.26.0",
 ]
 
 [project.optional-dependencies]
 laya = [
     "laya>=0.4.8",
+    "torch>=2.1.0",
+    "transformers>=4.48.0",
 ]
 dev = [
-    "pytest>=7.4.0",
+    "pytest>=8.0.0",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
-pythonpath = ["src"]
-addopts = "-q"

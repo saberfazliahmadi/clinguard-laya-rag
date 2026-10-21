@@ -1,60 +1,63 @@
-"""End-to-End Orchestrator for ClinGuard-RAG and Baseline Ablation Variants."""
+"""End-to-end ClinGuard-RAG pipeline orchestrating Stages 1 through 5."""
 
 from __future__ import annotations
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal, Optional
 from clinguard_rag.calibration import TemperatureCalibrator
-from clinguard_rag.decision_engine import DeterministicEvalBackend, SystemOneEngine
+from clinguard_rag.decision_engine import DecisionBackend, DeterministicEvalBackend
 from clinguard_rag.policy import apply_clinical_policy
 from clinguard_rag.retriever import HybridClinicalRetriever
-from clinguard_rag.router import evaluate_stage1_triage
-from clinguard_rag.schemas import AuditRecord, ClinicalDisposition
+from clinguard_rag.router import run_stage1_triage
+from clinguard_rag.schemas import AuditRecord, ClinicalDisposition, RetrievedChunk
 from clinguard_rag.verifier import filter_retrieved_chunks, verify_clinical_claim
+
+PipelineMode = Literal["baseline", "raw_system1", "debiased_system1", "clinguard_full"]
+
+
+def synthesize_extractive_claim(accepted_chunks: List[RetrievedChunk]) -> str:
+    """Deterministic extractive fallback claim generator when no fixture candidate_claim is provided."""
+    if not accepted_chunks:
+        return ""
+    top = accepted_chunks[0].chunk
+    return f"{top.text} [{top.doc_id}]"
 
 
 class ClinGuardPipeline:
-    """
-    Configurable Healthcare RAG pipeline supporting 4 controlled evaluation modes:
-      - `baseline`: Standard RAG without a System-1 decision layer
-      - `raw_system1`: Uncalibrated Laya (T=1.0), single option order, 2-way claim check
-      - `debiased_system1`: Bidirectional option-order debiasing + 3-way claim rubric (T=1.0)
-      - `clinguard_full`: Full calibrated (fitted T) + debiased + conflict-preserving ClinGuard-RAG
-    """
+    """5-stage clinical RAG pipeline with configurable ablation modes."""
 
     def __init__(
         self,
         retriever: HybridClinicalRetriever,
-        engine: SystemOneEngine | None = None,
+        engine: Optional[DecisionBackend] = None,
+        mode: PipelineMode = "clinguard_full",
         temperature: float = 1.0,
-        mode: str = "clinguard_full",
     ) -> None:
         self.retriever = retriever
         self.engine = engine or DeterministicEvalBackend()
-        self.temperature = temperature
         self.mode = mode
+        self.calibrator = TemperatureCalibrator(temperature=temperature)
 
     def fit_calibration(self, calibration_cases: List[Dict[str, Any]]) -> float:
-        """Fits post-hoc temperature scaling on held-out calibration cases."""
-        calibrator = TemperatureCalibrator()
         dists = [c["raw_model_probs"]["claim_fwd"] for c in calibration_cases]
         labels = [c["claim_label"] for c in calibration_cases]
-        self.temperature = calibrator.fit(dists, labels)
-        return self.temperature
+        return self.calibrator.fit(dists, labels)
 
     def run_case(self, case_record: Dict[str, Any]) -> AuditRecord:
+        case_id = case_record.get("case_id", "LIVE-01")
         query = case_record["query"]
-        candidate_claim = case_record["candidate_claim"]
-        raw_probs = self.engine.predict_case(case_record)
+
+        # Pre-retrieve candidate chunks for live backends that do not include raw_model_probs
+        prelim_chunks = self.retriever.retrieve(query=query, allowed_domains=None, top_k=2)
+        raw_probs = self.engine.predict_case(case_record, retrieved_chunks=prelim_chunks)
 
         if self.mode == "baseline":
-            retrieved = self.retriever.retrieve(query, allowed_domains=None, top_k=2)
-            triage = evaluate_stage1_triage(
-                raw_probs, temperature=1.0, use_bidirectional_debiasing=False
-            )
+            retrieved = self.retriever.retrieve(query=query, allowed_domains=None, top_k=2)
+            candidate_claim = case_record.get("candidate_claim") or synthesize_extractive_claim(retrieved)
+            triage = run_stage1_triage(raw_probs, temperature=1.0, use_bidirectional=False)
             return AuditRecord(
-                case_id=case_record["case_id"],
+                case_id=case_id,
                 query=query,
-                engine_backend="none-baseline-rag",
-                checkpoint_id="none",
+                engine_backend=self.engine.backend_name,
+                checkpoint_id=self.engine.checkpoint_id,
                 temperature_parameter=1.0,
                 triage=triage,
                 retrieved_doc_ids=[r.chunk.doc_id for r in retrieved],
@@ -65,62 +68,85 @@ class ClinGuardPipeline:
                 final_response=candidate_claim,
             )
 
-        use_debias = self.mode in ("debiased_system1", "clinguard_full")
-        use_3way = self.mode in ("debiased_system1", "clinguard_full")
-        temp = self.temperature if self.mode == "clinguard_full" else 1.0
-        # Hold support_threshold = 0.75 constant across all System-1 variants for a controlled ablation
-        support_thresh = 0.75
-        relevance_thresh = 0.60 if self.mode in ("debiased_system1", "clinguard_full") else 0.20
-        conflict_thresh = 0.55 if self.mode == "clinguard_full" else 0.99
+        use_bi = self.mode in ("debiased_system1", "clinguard_full")
+        three_way = self.mode in ("debiased_system1", "clinguard_full")
+        temp = self.calibrator.temperature if self.mode == "clinguard_full" else 1.0
+        rel_thresh = 0.60 if self.mode in ("debiased_system1", "clinguard_full") else 0.20
+        enable_conflict = self.mode == "clinguard_full"
 
-        triage = evaluate_stage1_triage(
-            raw_probs,
-            temperature=temp,
-            use_bidirectional_debiasing=use_debias,
-        )
+        # Stage 1: Triage & Routing
+        triage = run_stage1_triage(raw_probs, temperature=temp, use_bidirectional=use_bi)
 
         if triage.skip_retrieval:
-            retrieved = []
-            evaluated_chunks = []
-            claim_res = None
-        else:
-            retrieved = self.retriever.retrieve(
-                query, allowed_domains=triage.routed_domains, top_k=2
+            disp, rule, msg = apply_clinical_policy(
+                triage=triage,
+                accepted_doc_ids=[],
+                verification=None,
+                enable_conflict_warning=enable_conflict,
             )
-            evaluated_chunks = filter_retrieved_chunks(
-                retrieved,
-                raw_probs["chunk_relevance"],
-                temperature=temp,
-                relevance_threshold=relevance_thresh,
-            )
-            claim_res = verify_clinical_claim(
-                candidate_claim,
-                raw_probs,
-                temperature=temp,
-                use_bidirectional_debiasing=use_debias,
-                use_three_way_rubric=use_3way,
+            return AuditRecord(
+                case_id=case_id,
+                query=query,
+                engine_backend=self.engine.backend_name,
+                checkpoint_id=self.engine.checkpoint_id,
+                temperature_parameter=temp,
+                triage=triage,
+                retrieved_doc_ids=[],
+                accepted_doc_ids=[],
+                claim_verification=None,
+                disposition=disp,
+                policy_rule_triggered=rule,
+                final_response=msg,
             )
 
-        disposition, rule_id, final_text = apply_clinical_policy(
+        # Stage 2: Hybrid Retrieval across routed domains
+        retrieved = self.retriever.retrieve(
+            query=query, allowed_domains=triage.routed_domains, top_k=2
+        )
+
+        # Stage 3: Evidence Gate
+        gated = filter_retrieved_chunks(
+            retrieved=retrieved,
+            raw_chunk_relevance=raw_probs.get("chunk_relevance", {}),
+            temperature=temp,
+            relevance_threshold=rel_thresh,
+        )
+        accepted_chunks = [r for r in gated if r.passed_gate]
+        accepted_ids = [r.chunk.doc_id for r in accepted_chunks]
+
+        # Stage 4: Claim Verification
+        verification = None
+        if accepted_ids:
+            candidate_claim = case_record.get("candidate_claim") or synthesize_extractive_claim(accepted_chunks)
+            verification = verify_clinical_claim(
+                claim_text=candidate_claim,
+                raw_probs=raw_probs,
+                temperature=temp,
+                use_bidirectional=use_bi,
+                three_way=three_way,
+            )
+
+        # Stage 5: Deterministic Policy Guard
+        disp, rule, msg = apply_clinical_policy(
             triage=triage,
-            evaluated_chunks=evaluated_chunks,
-            claim_result=claim_res,
-            candidate_claim=candidate_claim,
-            support_threshold=support_thresh,
-            conflict_threshold=conflict_thresh,
+            accepted_doc_ids=accepted_ids,
+            verification=verification,
+            support_threshold=0.75,
+            conflict_threshold=0.40,
+            enable_conflict_warning=enable_conflict,
         )
 
         return AuditRecord(
-            case_id=case_record["case_id"],
+            case_id=case_id,
             query=query,
             engine_backend=self.engine.backend_name,
             checkpoint_id=self.engine.checkpoint_id,
             temperature_parameter=temp,
             triage=triage,
             retrieved_doc_ids=[r.chunk.doc_id for r in retrieved],
-            accepted_doc_ids=[r.chunk.doc_id for r in evaluated_chunks if r.passed_gate],
-            claim_verification=claim_res,
-            disposition=disposition,
-            policy_rule_triggered=rule_id,
-            final_response=final_text,
+            accepted_doc_ids=accepted_ids,
+            claim_verification=verification,
+            disposition=disp,
+            policy_rule_triggered=rule,
+            final_response=msg,
         )

@@ -1,13 +1,15 @@
-"""Hybrid Clinical Retriever combining BM25Okapi and Dense TF-IDF Cosine via RRF."""
+"""Stage 2: Hybrid BM25 + TF-IDF Cosine Reciprocal Rank Fusion (RRF) Clinical Retriever."""
 
 from __future__ import annotations
 import json
 import math
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional
 import numpy as np
-from clinguard_rag.schemas import GuidelineChunk, RetrievedChunk
+from rank_bm25 import BM25Okapi
+from clinguard_rag.schemas import ClinicalChunk, RetrievedChunk
 
 
 def _tokenize(text: str) -> List[str]:
@@ -15,65 +17,44 @@ def _tokenize(text: str) -> List[str]:
 
 
 class HybridClinicalRetriever:
-    """In-memory BM25 + TF-IDF Cosine Reciprocal Rank Fusion retriever for clinical passages."""
+    """Combines lexical BM25Okapi with L2-normalized IDF vector cosine similarity via RRF."""
 
-    def __init__(self, chunks: List[GuidelineChunk], rrf_k: int = 60) -> None:
+    def __init__(self, chunks: List[ClinicalChunk], rrf_k: int = 60) -> None:
         self.chunks = chunks
         self.rrf_k = rrf_k
-        self.doc_tokens = [
-            _tokenize(f"{c.title} {c.text} {' '.join(c.clinical_keywords)}")
-            for c in chunks
-        ]
-        self.doc_lens = [len(toks) for toks in self.doc_tokens]
-        self.avgdl = sum(self.doc_lens) / max(1, len(self.doc_lens))
+        self._tokenized = [_tokenize(f"{c.title} {c.text}") for c in chunks]
+        self._bm25 = BM25Okapi(self._tokenized)
 
-        vocab_set = sorted({tok for toks in self.doc_tokens for tok in toks})
-        self.vocab = {w: i for i, w in enumerate(vocab_set)}
-        self.idf: Dict[str, float] = {}
-        n_docs = len(chunks)
-        for w in vocab_set:
-            df = sum(1 for toks in self.doc_tokens if w in toks)
-            self.idf[w] = math.log(1.0 + (n_docs - df + 0.5) / (df + 0.5))
+        # Build vocabulary & IDF-weighted normalized vectors
+        df: Counter[str] = Counter()
+        for toks in self._tokenized:
+            for t in set(toks):
+                df[t] += 1
+        self._vocab: Dict[str, int] = {t: i for i, t in enumerate(sorted(df.keys()))}
+        n_docs = max(1, len(chunks))
+        self._idf = np.zeros(len(self._vocab), dtype=np.float64)
+        for term, idx in self._vocab.items():
+            self._idf[idx] = math.log((n_docs + 1.0) / (df[term] + 0.5)) + 1.0
 
-        self.tfidf_matrix = np.zeros((n_docs, len(self.vocab)), dtype=np.float64)
-        for d_idx, toks in enumerate(self.doc_tokens):
-            for tok in toks:
-                v_idx = self.vocab[tok]
-                self.tfidf_matrix[d_idx, v_idx] += self.idf[tok]
-            norm = np.linalg.norm(self.tfidf_matrix[d_idx])
-            if norm > 0:
-                self.tfidf_matrix[d_idx] /= norm
+        self._doc_vecs = np.zeros((len(chunks), len(self._vocab)), dtype=np.float64)
+        for i, toks in enumerate(self._tokenized):
+            self._doc_vecs[i] = self._encode(toks)
+
+    def _encode(self, tokens: List[str]) -> np.ndarray:
+        vec = np.zeros(len(self._vocab), dtype=np.float64)
+        counts = Counter(tokens)
+        for t, c in counts.items():
+            if t in self._vocab:
+                idx = self._vocab[t]
+                vec[idx] = (1.0 + math.log(c)) * self._idf[idx]
+        norm = float(np.linalg.norm(vec))
+        return vec / norm if norm > 0 else vec
 
     @classmethod
     def from_json(cls, path: str | Path) -> "HybridClinicalRetriever":
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
-        return cls([GuidelineChunk(**item) for item in raw])
-
-    def _bm25_score(self, q_tokens: List[str], doc_idx: int, k1: float = 1.5, b: float = 0.75) -> float:
-        toks = self.doc_tokens[doc_idx]
-        dl = self.doc_lens[doc_idx]
-        score = 0.0
-        for q in q_tokens:
-            if q not in self.idf:
-                continue
-            tf = toks.count(q)
-            if tf == 0:
-                continue
-            num = tf * (k1 + 1.0)
-            den = tf + k1 * (1.0 - b + b * (dl / self.avgdl))
-            score += self.idf[q] * (num / den)
-        return score
-
-    def _dense_score(self, q_tokens: List[str], doc_idx: int) -> float:
-        q_vec = np.zeros(len(self.vocab), dtype=np.float64)
-        for q in q_tokens:
-            if q in self.vocab:
-                q_vec[self.vocab[q]] += self.idf[q]
-        norm = np.linalg.norm(q_vec)
-        if norm == 0:
-            return 0.0
-        q_vec /= norm
-        return float(np.dot(q_vec, self.tfidf_matrix[doc_idx]))
+        chunks = [ClinicalChunk(**item) for item in raw]
+        return cls(chunks=chunks)
 
     def retrieve(
         self,
@@ -81,36 +62,50 @@ class HybridClinicalRetriever:
         allowed_domains: Optional[List[str]] = None,
         top_k: int = 2,
     ) -> List[RetrievedChunk]:
-        q_tokens = _tokenize(query)
-        candidates = [
-            i for i, c in enumerate(self.chunks)
-            if not allowed_domains or c.domain in allowed_domains
-        ]
-        if not candidates:
+        # Fail-closed when an explicitly empty domain list is passed (L2 fix)
+        if allowed_domains is not None and len(allowed_domains) == 0:
             return []
 
-        bm25_scores = {i: self._bm25_score(q_tokens, i) for i in candidates}
-        dense_scores = {i: self._dense_score(q_tokens, i) for i in candidates}
+        q_tokens = _tokenize(query)
+        if not q_tokens:
+            return []
 
-        bm25_ranked = sorted(candidates, key=lambda i: bm25_scores[i], reverse=True)
-        dense_ranked = sorted(candidates, key=lambda i: dense_scores[i], reverse=True)
+        bm25_all = np.array(self._bm25.get_scores(q_tokens), dtype=np.float64)
+        q_vec = self._encode(q_tokens)
+        dense_all = self._doc_vecs @ q_vec
 
-        bm25_rank_map = {doc_i: r + 1 for r, doc_i in enumerate(bm25_ranked)}
-        dense_rank_map = {doc_i: r + 1 for r, doc_i in enumerate(dense_ranked)}
+        candidate_indices = [
+            i
+            for i, c in enumerate(self.chunks)
+            if (allowed_domains is None or c.domain in allowed_domains)
+            and (bm25_all[i] > 0.0 or dense_all[i] > 0.0)  # Filter out zero-overlap chunks (M5 fix)
+        ]
+        if not candidate_indices:
+            return []
 
-        results: List[RetrievedChunk] = []
-        for i in candidates:
-            rrf = (1.0 / (self.rrf_k + bm25_rank_map[i])) + (
-                1.0 / (self.rrf_k + dense_rank_map[i])
+        bm25_ranked = sorted(candidate_indices, key=lambda idx: bm25_all[idx], reverse=True)
+        dense_ranked = sorted(candidate_indices, key=lambda idx: dense_all[idx], reverse=True)
+
+        bm25_rank_map = {idx: rank + 1 for rank, idx in enumerate(bm25_ranked)}
+        dense_rank_map = {idx: rank + 1 for rank, idx in enumerate(dense_ranked)}
+
+        rrf_scores: Dict[int, float] = {}
+        for idx in candidate_indices:
+            rrf_scores[idx] = (1.0 / (self.rrf_k + bm25_rank_map[idx])) + (
+                1.0 / (self.rrf_k + dense_rank_map[idx])
             )
+
+        final_indices = sorted(candidate_indices, key=lambda idx: rrf_scores[idx], reverse=True)[:top_k]
+        results: List[RetrievedChunk] = []
+        for idx in final_indices:
             results.append(
                 RetrievedChunk(
-                    chunk=self.chunks[i],
-                    bm25_score=round(bm25_scores[i], 4),
-                    dense_score=round(dense_scores[i], 4),
-                    rrf_score=round(rrf, 6),
+                    chunk=self.chunks[idx],
+                    bm25_score=round(float(bm25_all[idx]), 4),
+                    dense_score=round(float(dense_all[idx]), 4),
+                    rrf_score=round(float(rrf_scores[idx]), 6),
+                    bm25_rank=bm25_rank_map[idx],
+                    dense_rank=dense_rank_map[idx],
                 )
             )
-
-        results.sort(key=lambda r: (r.rrf_score, r.bm25_score), reverse=True)
-        return results[:top_k]
+        return results

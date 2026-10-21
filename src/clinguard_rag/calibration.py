@@ -1,9 +1,18 @@
 """Post-hoc Temperature Scaling and calibration metrics (ECE, Brier Score, NLL)."""
 
 from __future__ import annotations
-from typing import Dict, List, Tuple
+import math
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 
+def multiclass_nll(dists: List[Dict[str, float]], labels: List[str], temperature: float = 1.0) -> float:
+    total_loss = 0.0
+    eps = 1e-15
+    for dist, label in zip(dists, labels):
+        cooled = apply_temperature_to_distribution(dist, temperature)
+        prob = max(eps, cooled.get(label, eps))
+        total_loss -= math.log(prob)
+    return total_loss / max(1, len(dists))
 
 def apply_temperature_to_distribution(
     probs: Dict[str, float], temperature: float
@@ -60,8 +69,13 @@ def compute_ece_and_brier(
 class TemperatureCalibrator:
     """Fits a scalar temperature T on held-out calibration predictions via NLL grid search."""
 
-    def __init__(self, initial_temperature: float = 1.0) -> None:
-        self.temperature: float = initial_temperature
+    def __init__(
+        self,
+        initial_temperature: float = 1.0,
+        temperature: Optional[float] = None,
+    ) -> None:
+        target_temp = temperature if temperature is not None else initial_temperature
+        self.temperature: float = target_temp
 
     def fit(self, distributions: List[Dict[str, float]], true_labels: List[str]) -> float:
         best_t = 1.0
