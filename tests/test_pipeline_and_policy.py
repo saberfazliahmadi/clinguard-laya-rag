@@ -97,6 +97,9 @@ def test_ablation_progression_and_calibration_improvement() -> None:
     summary = run_benchmark()
 
     assert summary["baseline"]["disposition_accuracy"] == 0.4
+    assert summary["retrieval_baseline"]["disposition_accuracy"] == 0.5
+    assert summary["retrieval_baseline"]["unsafe_claim_leakage_rate"] < summary["baseline"]["unsafe_claim_leakage_rate"]
+    assert summary["retrieval_baseline"]["brier_score"] is None
     assert summary["raw_system1"]["disposition_accuracy"] == 0.6
     assert summary["debiased_system1"]["disposition_accuracy"] == 0.8
     assert summary["clinguard_full"]["disposition_accuracy"] == 1.0
@@ -135,6 +138,11 @@ def test_live_backend_predict_case_and_direct_policy_rules(monkeypatch: Any) -> 
         questions=[{"id": "q_choice", "type": "choice", "question": "Pick", "options": ["a", "b"]}],
     )
     assert local_out["answers"]["q_choice"]["probabilities"]["a"] == 0.9
+
+    # Fail-closed check for non-local SystemOneHTTPBackend without explicit override
+    import pytest
+    with pytest.raises(ValueError, match="fail-closed"):
+        SystemOneHTTPBackend(base_url="https://api.typesafe.ai")
 
     # Direct unit test of SystemOneHTTPBackend with monkeypatched httpx.Client
     http_backend = SystemOneHTTPBackend(base_url="http://localhost:8000", api_key="test-key")

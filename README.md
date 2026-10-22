@@ -552,11 +552,12 @@ Adding each layer of protection steadily eliminates dangerous failures on the 10
 3. **Bidirectional Debiased Guard (`debiased_system1`):** Fixes option-order bias and filters out low-relevance passages (**$80\%$ accuracy**, **$20\%$ unsafe leakage**), but still misses guideline conflict warnings (`EVAL-03`) and leaks one borderline overconfident claim (`EVAL-09`).
 4. **Full Calibrated Guard (`clinguard_full`):** Adds temperature scaling ($T = 1.4$) and conflict preservation (`RULE 5`), achieving **$100\%$ (`10/10`) disposition accuracy** and **$0\%$ (`0/5`) unsafe claim leakage**, while steadily improving probability forecast quality (**Top-Label Brier Score** drops from $0.2158 \to 0.1773 \to 0.1668$).
 
-### Offline Golden-Fixture Policy & Calibration Comparison Table ($N = 10$ Held-Out Test Cases)
+### Policy-Logic Test on Golden Fixtures: 5-Mode Comparison Table ($N = 10$ Held-Out Test Cases)
 
 | Pipeline Mode | Temp ($T$) | Correct Dispositions ($N=10$) | Unsafe Claims Leaked ($N=5$ unsafe) | Top-Label Brier Score ($\downarrow$ better) | Multi-Class NLL ($\downarrow$ better) | 10-Bin ECE ($\downarrow$ better) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`baseline`** (No System-1 Guard) | `1.0` | `40.0%` (`4/10`) | `100.0%` (`5/5`) | -- | -- | -- |
+| **`baseline`** (No Guard) | `1.0` | `40.0%` (`4/10`) | `100.0%` (`5/5`) | -- | -- | -- |
+| **`retrieval_baseline`** (Calibrated Lexical-Overlap Gate Only) | `1.0` | `50.0%` (`5/10`) | `60.0%` (`3/5`) | -- | -- | -- |
 | **`raw_system1`** (Forward-Only, 2-Way, Uncalibrated) | `1.0` | `60.0%` (`6/10`) | `60.0%` (`3/5`) | `0.2158` | `0.7688` | `0.2400` |
 | **`debiased_system1`** (+ Bidirectional Order + 3-Way Judge) | `1.0` | `80.0%` (`8/10`) | `20.0%` (`1/5`) | `0.1773` | `0.6458` | `0.2315` |
 | **`clinguard_full`** (+ $T=1.4$ Calibration + Conflict Rule) | **`1.4`** | **`100.0%` (`10/10`)** | **`0.0%` (`0/5`)** | **`0.1668`** | **`0.6251`** | `0.2574` |

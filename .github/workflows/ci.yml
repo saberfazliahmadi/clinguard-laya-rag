@@ -1,41 +1,40 @@
-name: ClinGuard-RAG Parity & Evaluation CI
+name: ClinGuard-RAG CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
-  test-and-evaluate:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install package and test dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Run unit and integration test suite
+      - name: Run Ruff linter and Mypy type checker
         run: |
-          python -m pytest -v
-        env:
-          PYTHONPATH: src:.
+          ruff check src tests scripts
+          PYTHONPATH=src mypy src
 
-      - name: Verify reproducible ablation benchmark & CLI audit output
+      - name: Run pytest suite
         run: |
-          python scripts/run_evaluation.py
-          python scripts/demo_cli.py --case-id EVAL-03 --mode clinguard_full
-        env:
-          PYTHONPATH: src:.
+          PYTHONPATH=src:. pytest -v
+
+      - name: Run deterministic evaluation benchmark
+        run: |
+          PYTHONPATH=src:. python scripts/run_evaluation.py
