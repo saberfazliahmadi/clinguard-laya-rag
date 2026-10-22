@@ -41,8 +41,8 @@ To keep expectations crystal clear, here is what runs out of the box when you cl
 | **Hybrid search engine** (keyword BM25 + TF-IDF vector cosine similarity merged via Reciprocal Rank Fusion) | **Fully implemented & tested** | `src/clinguard_rag/retriever.py` |
 | **Positional debiasing & temperature calibration** (forward/reverse option averaging, token budget checks, and NLL grid search) | **Fully implemented & tested** | `src/clinguard_rag/debiasing.py`, `src/clinguard_rag/calibration.py` |
 | **Offline deterministic benchmark & audit logger** (16 clinical cases with recorded probability fixtures and Pydantic `AuditRecord` output) | **Fully implemented & tested** | `data/evaluation_benchmark.json`, `scripts/run_evaluation.py` |
-| **Live Laya SDK & HTTP `/v1/systemone` clients** (`predict_raw` wrappers with basic regex scrubbing) | **Low-level adapters implemented** (requires optional weights/server to run live) | `src/clinguard_rag/decision_engine.py` |
-| **Live LLM free-text answer generation** | **Simulated via benchmark fixtures** (`candidate_claim` strings are pre-recorded so verification is $100\%$ reproducible) | `data/evaluation_benchmark.json` |
+| **Live Laya SDK & HTTP `/v1/systemone` clients** (`predict_case` & `predict_raw` wrappers with `laya==0.4.12` schema normalization and regex PHI scrubbing) | **Adapters implemented & unit-tested** (requires optional model weights or HTTP server for live inference) | `src/clinguard_rag/decision_engine.py` |
+| **Live LLM free-text answer generation** | **Simulated via benchmark fixtures** (`candidate_claim` strings are pre-recorded with an extractive fallback so verification is $100\%$ reproducible) | `data/evaluation_benchmark.json`, `src/clinguard_rag/pipeline.py` |
 
 ### Choose Your Reading Path
 
@@ -140,7 +140,7 @@ flowchart TD
     S1 -->|Unsafe / prompt attack >= 0.65<br/>OR Out of scope >= 0.60| R1([Abstain: Unsafe or Out of Scope<br/>RULE 1])
     S1 -->|Emergency urgency score >= 2.40<br/>on 0 to 3 scale| R2([Escalate: Acute Clinical Emergency<br/>RULE 2])
 
-    S1 -->|Safe query: Search 1 domain if top >= 0.55<br/>Otherwise search top 2 domains| S2[Stage 2: Hybrid Keyword + Vector Search<br/>src/clinguard_rag/retriever.py]
+    S1 -->|Safe query: Search 1 domain if top >= 0.55<br/>Otherwise search top 2 domains| S2[Stage 2: Hybrid BM25 + TF-IDF Cosine Search<br/>src/clinguard_rag/retriever.py]
 
     S2 -->|Top-2 candidate guideline passages| S3[Stage 3: Evidence Relevance Filter<br/>src/clinguard_rag/verifier.py]
 
@@ -177,13 +177,13 @@ flowchart TD
 
 2. **Stage 2 -- Hybrid Clinical Retriever (`src/clinguard_rag/retriever.py`)**
    - **What goes in:** The query string and the 1 or 2 `routed_domains` from Stage 1.
-   - **What it does:** Scores all guideline passages in those domains using both exact keyword matching (`BM25Okapi`) and term-weighted vector cosine similarity, then merges the two ranked lists using Reciprocal Rank Fusion.
+   - **What it does:** Scores all guideline passages in those domains using both exact keyword matching (`BM25Okapi`) and TF-IDF vector cosine similarity, then merges the two ranked lists using Reciprocal Rank Fusion.
    - **What comes out:** A list of the top $k=2$ `RetrievedChunk` objects (including `doc_id`, `title`, `text`, and rank scores).
-   - **Why the next stage needs it:** Keyword and vector search cast a wide net; Stage 3 needs these candidate chunks so it can inspect their clinical applicability one by one.
+   - **Why the next stage needs it:** Keyword and TF-IDF vector search cast a wide net; Stage 3 needs these candidate chunks so it can inspect their clinical applicability one by one.
 
 3. **Stage 3 -- Post-Retrieval Evidence Gate (`src/clinguard_rag/verifier.py`)**
    - **What goes in:** The candidate `RetrievedChunk` list from Stage 2 and temperature $T$.
-   - **What it does:** Evaluates each chunk's calibrated relevance probability (`P(chunk_relevance)`). Chunks scoring at or above `relevance_threshold = 0.60` (in `debiased_system1` and `clinguard_full` modes) are kept; chunks below $0.60$ are discarded.
+   - **What it does:** Evaluates each chunk's calibrated relevance probability (`P(chunk_relevance)`). Chunks scoring at or above `relevance_threshold = 0.60` (in `debiased_system1` and `clinguard_full` modes) are kept; chunks below $0.60$ (or missing scores) are discarded fail-closed.
    - **What comes out:** Two lists of document IDs: `retrieved_doc_ids` (all candidates from Stage 2) and `accepted_doc_ids` (only chunks that passed the gate).
    - **Why the next stage needs it:** Stage 4 must know which document IDs were accepted so it can verify that the candidate claim cites genuine, accepted evidence rather than a rejected distractor.
 
@@ -209,8 +209,8 @@ This section introduces the key machine learning concepts used in `ClinGuard-RAG
 - **In plain English:** Most people interact with **System-2** AI models (like ChatGPT or Claude), which generate text word-by-word. By contrast, a **System-1 decision model**--such as open-weight **Laya** (`convaiinnovations/laya-typed-decisions`, 421M parameters built on `ModernBERT-large`) or commercial **Jev** (`/v1/systemone`)--does not write essays. You give it a piece of text (`state`) and a structured question, and it returns a probability table in a single fast calculation (forward pass).
 - **Why it matters here:** Using a small, fast System-1 model for routing and verification avoids parsing messy generated JSON and allows stages 1, 3, and 4 to run locally inside a hospital's hardware boundary.
 - **The three question primitives:**
-  1. **`choice` (Multiple Choice):** Picks among categorical options (e.g., `["supported", "contradicted", "not_mentioned"]`) and returns probabilities summing to $1.0$.
-  2. **`score` (Ordered Scale):** Rates an item on a numeric scale (e.g., clinical urgency `0`, `1`, `2`, `3`) and computes the weighted average (expected score).
+  1. **`choice` (Multiple Choice):** Picks among categorical options (passed via `criteria`, e.g., `["supported", "contradicted", "not_mentioned"]`) and returns probabilities summing to $1.0$.
+  2. **`score` (Ordered Scale):** Rates an item on a numeric scale (passed via `criteria` for levels `0`, `1`, `2`, `3`) and computes the weighted average (expected score).
   3. **`noul` (Yes/No Proposition):** Returns a single probability between $0.0$ and $1.0$ that a statement holds (e.g., *"Is this passage relevant to the query?"*).
 
 <details>
@@ -229,21 +229,21 @@ $$\text{tokens\_per\_option}(K) = \max\left(4, \left\lfloor \frac{192 - 16}{K} \
 
 ### 5.2 Hybrid Search and Reciprocal Rank Fusion (RRF)
 
-- **In plain English:** When searching medical guidelines, you want to find passages that match **exact medical terms** (like `dapagliflozin` or `eGFR 28`) *and* passages that match the **broader topic** (like kidney function in heart failure). `ClinGuard-RAG` runs two searches in parallel--a keyword search (**BM25**) and a concept-vector search (**Dense TF-IDF Cosine Similarity**)--and combines their rankings using a simple fairness rule called **Reciprocal Rank Fusion (RRF)**.
-- **Why it matters here:** Relying only on keywords misses synonyms; relying only on broad vectors can miss exact dosage numbers. RRF rewards passages that rank near the top of *both* lists without needing complex score normalization.
+- **In plain English:** When searching medical guidelines, you want to find passages that match **exact medical terms** (like `dapagliflozin` or `eGFR 28`) *and* passages that match the **broader topic** (like kidney function in heart failure). `ClinGuard-RAG` runs two searches in parallel--a keyword search (**BM25**) and a term-weighted vector search (**TF-IDF Cosine Similarity**)--and combines their rankings using a simple fairness rule called **Reciprocal Rank Fusion (RRF)**.
+- **Why it matters here:** Relying only on exact BM25 rank can miss broader term weighting; relying only on cosine similarity can miss exact dosage prominence. RRF rewards passages that rank near the top of *both* lists without needing complex score normalization.
 - **Intuition example:** If Document A ranks **#1** in keyword search and **#2** in vector search, RRF adds its rank fractions together so it beats a document that ranked #1 in one list but #10 in the other.
 
 <details>
-<summary><strong>Advanced Technical Details: BM25, Dense Cosine, and RRF Equations (`retriever.py`)</strong></summary>
+<summary><strong>Advanced Technical Details: BM25, TF-IDF Cosine, and RRF Equations (`retriever.py`)</strong></summary>
 
 For each candidate document $d$ in the routed domains, `HybridClinicalRetriever` computes:
 1. **BM25 Rank ($\text{rank}_{\text{BM25}}(d) \in \{1, 2, \dots\}$):** Using `BM25Okapi` ($k_1 = 1.5, b = 0.75$) over regex word tokens `[a-z0-9]+`.
-2. **Dense Cosine Rank ($\text{rank}_{\text{dense}}(d) \in \{1, 2, \dots\}$):** Using L2-normalized smoothed Inverse Document Frequency (IDF) vectors $\hat{v}(q) \cdot \hat{v}(d)$.
+2. **TF-IDF Cosine Rank ($\text{rank}_{\text{dense}}(d) \in \{1, 2, \dots\}$):** Using L2-normalized smoothed Inverse Document Frequency (IDF) vectors $\hat{v}(q) \cdot \hat{v}(d)$.
 3. **Reciprocal Rank Fusion Score ($k_{\text{RRF}} = 60$):**
 
 $$\text{RRF}(d) = \frac{1}{60 + \text{rank}_{\text{BM25}}(d)} + \frac{1}{60 + \text{rank}_{\text{dense}}(d)}$$
 
-The top `top_k = 2` documents by $\text{RRF}(d)$ are returned to Stage 3.
+The top `top_k = 2` documents by $\text{RRF}(d)$ (with positive lexical overlap) are returned to Stage 3.
 </details>
 
 ---
@@ -320,7 +320,7 @@ All commands in Steps 6.1-6.4 are **required for the standard reproduction**, ru
 
 **1. Clone the repository:**
 ```bash
-git clone [https://github.com/saberfazliahmadi/clinguard-laya-rag.git](https://github.com/saberfazliahmadi/clinguard-laya-rag.git)
+git clone https://github.com/saberfazliahmadi/clinguard-laya-rag.git
 cd clinguard-laya-rag
 ```
 
@@ -348,7 +348,7 @@ pip install -e ".[dev]"
 
 ### 6.2 Run the Automated Test Suite (`pytest`)
 
-Because the integration test file (`tests/test_pipeline_and_policy.py`) imports `run_benchmark` from `scripts/run_evaluation.py`, set `PYTHONPATH` to include both `src` and the project root:
+`pyproject.toml` automatically configures `pythonpath = ["src", "."]`, so you can run `pytest` directly from the repository root (or set `PYTHONPATH` explicitly):
 
 - **Windows (PowerShell):**
   ```powershell
@@ -363,13 +363,13 @@ Because the integration test file (`tests/test_pipeline_and_policy.py`) imports 
 **Expected Output:**
 ```text
 ============================= test session starts =============================
-collected 8 items
+collected 9 items
 
-tests/test_debiasing_and_calibration.py ....                             [ 50%]
-tests/test_pipeline_and_policy.py ..                                     [ 75%]
+tests/test_debiasing_and_calibration.py ....                             [ 44%]
+tests/test_pipeline_and_policy.py ...                                    [ 77%]
 tests/test_retriever_and_router.py ..                                    [100%]
 
-============================== 8 passed in 1.57s ==============================
+============================== 9 passed in 1.37s ==============================
 ```
 
 ---
@@ -522,19 +522,18 @@ from clinguard_rag.decision_engine import SystemOneHTTPBackend
 backend = SystemOneHTTPBackend(base_url="http://localhost:8000", timeout_s=5.0)
 response = backend.predict_raw(
     state="Patient eGFR is 28 mL/min/1.73m2. Query asks about initiating metformin.",
-    questions=[
-        {
-            "id": "claim_verdict",
+    questions={
+        "claim_verdict": {
             "type": "choice",
-            "question": "Is the claim supported by the evidence?",
-            "options": ["supported", "contradicted", "not_mentioned"],
+            "instructions": "Is the claim supported by the evidence?",
+            "criteria": ["supported", "contradicted", "not_mentioned"],
         }
-    ],
+    },
 )
 ```
 
 **Environment Variables:**
-- `PYTHONPATH`: Set to `src:.` (Linux/macOS) or `"$PWD\src;$PWD"` (PowerShell) when running `pytest`.
+- `PYTHONPATH`: Set to `src:.` (Linux/macOS) or `"$PWD\src;$PWD"` (PowerShell) when running scripts or tests manually.
 - `USE_TF`: Automatically set to `"0"` inside `LayaLocalBackend` to avoid TensorFlow/Transformers import deadlocks.
 - `LAYA_API_KEY`: Optional Bearer token read by `SystemOneHTTPBackend` when calling a secured `/v1/systemone` endpoint.
 </details>
@@ -551,7 +550,7 @@ Adding each layer of protection steadily eliminates dangerous failures on the 10
 1. **No Guard (`baseline`):** Serves every candidate answer blindly, resulting in **$40\%$ accuracy** and leaking **$100\%$ (`5/5`) of unsafe/unsupported claims**.
 2. **Uncalibrated Single-Pass Guard (`raw_system1`):** Catches obvious prompt attacks and emergencies (**$60\%$ accuracy**), but still gets tricked by option-order bias, missing evidence, and overconfident scores (**$60\%$ unsafe leakage**).
 3. **Bidirectional Debiased Guard (`debiased_system1`):** Fixes option-order bias and filters out low-relevance passages (**$80\%$ accuracy**, **$20\%$ unsafe leakage**), but still misses guideline conflict warnings (`EVAL-03`) and leaks one borderline overconfident claim (`EVAL-09`).
-4. **Full Calibrated Guard (`clinguard_full`):** Adds temperature scaling ($T = 1.4$) and conflict preservation (`RULE 5`), achieving **$100\%$ (`10/10`) disposition accuracy** and **$0\%$ (`0/5`) unsafe claim leakage**, while steadily improving probability forecast quality (**Brier Score** drops from $0.2158 \to 0.1773 \to 0.1668$).
+4. **Full Calibrated Guard (`clinguard_full`):** Adds temperature scaling ($T = 1.4$) and conflict preservation (`RULE 5`), achieving **$100\%$ (`10/10`) disposition accuracy** and **$0\%$ (`0/5`) unsafe claim leakage**, while steadily improving probability forecast quality (**Top-Label Brier Score** drops from $0.2158 \to 0.1773 \to 0.1668$).
 
 ### 4-Mode Comparison Table ($N = 10$ Held-Out Test Cases)
 
@@ -562,12 +561,12 @@ Adding each layer of protection steadily eliminates dangerous failures on the 10
 | **`debiased_system1`** (+ Bidirectional Order + 3-Way Judge) | `1.0` | `80.0%` (`8/10`) | `20.0%` (`1/5`) | `0.1773` | `0.6458` | `0.2315` |
 | **`clinguard_full`** (+ $T=1.4$ Calibration + Conflict Rule) | **`1.4`** | **`100.0%` (`10/10`)** | **`0.0%` (`0/5`)** | **`0.1668`** | **`0.6251`** | `0.2574` |
 
-### What Do Brier Score, NLL, and ECE Measure?
+### What Do Top-Label Brier Score, NLL, and ECE Measure?
 
-- **Brier Score (`0.2158` $\to$ `0.1668`):** Answers *"How close are the model's predicted probabilities to the true outcome (0 or 1)?"* It is the average squared distance between confidence and truth. Lower is better.
+- **Top-Label Brier Score (`0.2158` $\to$ `0.1668`):** Answers *"How close is the model's top-label confidence to whether that top prediction is actually right (0 or 1)?"* It is the average squared distance between top-label confidence and binary correctness. Lower is better.
 - **Multi-Class Negative Log-Likelihood / NLL (`0.7688` $\to$ `0.6251`):** Answers *"How much probability mass did the model assign to the true 3-way label (`supported`, `contradicted`, or `not_mentioned`)?"* It heavily penalizes confident wrong answers. Lower is better.
 - **10-Bin Expected Calibration Error / ECE (`0.2400` $\to$ `0.2315` $\to$ `0.2574`):** Groups predictions into 10 confidence buckets ($0.0\text{--}0.1, \dots, 0.9\text{--}1.0$) and measures the average gap between bucket confidence and bucket accuracy.
-  - *Why does 10-bin ECE tick up slightly from `0.2315` to `0.2574` at $T = 1.4$?* On a tiny sample of $N = 10$ cases, 8 predictions are correct in their high-confidence bucket (so bucket accuracy is $1.00$). When $T = 1.4$ cools their probabilities from $\sim 0.93$ down to $\sim 0.85$ to prevent overconfident false positives (`EVAL-09`), the arithmetic gap $\vert{}1.00 - 0.85\vert{}$ inside that bucket widens slightly. Because equal-width binning is noisy at $N = 10$, `ClinGuard-RAG` fits $T$ using continuous **Multi-Class NLL** and validates monotonic improvement using **Brier Score** and **NLL**.
+  - *Why does 10-bin ECE tick up slightly from `0.2315` to `0.2574` at $T = 1.4$?* On a tiny sample of $N = 10$ cases, 8 predictions are correct in their high-confidence bucket (so bucket accuracy is $1.00$). When $T = 1.4$ cools their probabilities from $\sim 0.93$ down to $\sim 0.85$ to prevent overconfident false positives (`EVAL-09`), the arithmetic gap $\vert{}1.00 - 0.85\vert{}$ inside that bucket widens slightly. Because equal-width binning is noisy at $N = 10$, `ClinGuard-RAG` fits $T$ using continuous **Multi-Class NLL** and validates monotonic improvement using **Top-Label Brier Score** and **NLL**.
 
 <details>
 <summary><strong>Click to expand: Complete 6 Policy Rules, Thresholds, and All 10 Per-Case Outcomes (EVAL-01 to EVAL-10)</strong></summary>
@@ -577,8 +576,9 @@ All three System-1 modes use the same claim support cutoff (`support_threshold =
 
 | Priority | Rule ID | Exact Trigger Condition | Output Disposition |
 | :---: | :--- | :--- | :--- |
-| **1** | `RULE_1_SAFETY_OR_OUT_OF_SCOPE_GATE` | Calibrated `P(prompt_attack_or_unsafe)` $\ge 0.65$ **or** `P(out_of_scope)` $\ge 0.60$ | `ABSTAIN_UNSAFE_OR_OUT_OF_SCOPE` |
-| **2** | `RULE_2_ACUTE_CLINICAL_EMERGENCY` | Stage 1 expected urgency score $E[\text{urgency}] \ge 2.40$ (on `0..3` scale) | `ESCALATE_ACUTE_EMERGENCY` |
+| **1a** | `RULE_1_SAFETY_OR_OUT_OF_SCOPE_GATE` | Calibrated `P(prompt_attack_or_unsafe)` $\ge 0.65$ | `ABSTAIN_UNSAFE_OR_OUT_OF_SCOPE` |
+| **2** | `RULE_2_ACUTE_CLINICAL_EMERGENCY` | Stage 1 expected urgency score $E[\text{urgency}] \ge 2.40$ (on `0..3` scale; checked before out-of-scope so emergencies are never silently dropped) | `ESCALATE_ACUTE_EMERGENCY` |
+| **1b** | `RULE_1_SAFETY_OR_OUT_OF_SCOPE_GATE` | Calibrated `P(out_of_scope)` $\ge 0.60$ | `ABSTAIN_UNSAFE_OR_OUT_OF_SCOPE` |
 | **3** | `RULE_3_INSUFFICIENT_RETRIEVED_EVIDENCE` | Zero retrieved chunks pass `P(chunk_relevance)` $\ge 0.60$ ($\ge 0.20$ in `raw_system1`) | `ABSTAIN_INSUFFICIENT_EVIDENCE` |
 | **4** | `RULE_4_UNVERIFIED_OR_INSTABLE_CLAIM` | $\Delta_{\text{order}} > 0.25$, argmax $\ne \text{supported}$, `P(contradicted)` $\ge 0.30$, `P(supported)` $< 0.75$, **or** no cited `[DOC-ID]` in `accepted_doc_ids` | `ESCALATE_UNVERIFIED_OR_CONFLICT` |
 | **5** | `RULE_5_PRESERVE_GUIDELINE_CONFLICT` | Claim passes Rule 4 **and** calibrated `P(guidelines_conflict)` $\ge 0.40$ (active in `clinguard_full`) | `SERVE_WITH_CONFLICT_WARNING` |
@@ -608,14 +608,14 @@ For deeper analysis, see [`docs/evaluation_report.md`](docs/evaluation_report.md
 
 ### Security and Privacy Boundaries
 1. **Local-First Triage Design:** When connected to `LayaLocalBackend` or an on-premises `laya-serve` container, query triage (Stage 1), relevance filtering (Stage 3), and claim verification (Stage 4) run inside the local network boundary before any external service is called.
-2. **Illustrative Regex Scrubbing (`redact_phi_hook`):** `src/clinguard_rag/decision_engine.py` includes a regex helper that masks email addresses and standard phone numbers before sending text to `LayaLocalBackend` or `SystemOneHTTPBackend`. **Important Limitation:** Regex matching only catches simple surface patterns and is **not** a certified HIPAA Safe Harbor or GDPR de-identification system. Real clinical deployments require dedicated clinical de-identification pipelines and signed Business Associate Agreements (BAAs).
+2. **Illustrative Regex Scrubbing (`redact_phi_hook`):** `src/clinguard_rag/decision_engine.py` includes a regex helper that masks email addresses, formatted phone numbers, Medical Record Numbers (MRNs), and Dates of Birth (DOBs) before sending text to `LayaLocalBackend` or `SystemOneHTTPBackend`. **Important Limitation:** Regex matching only catches structured surface patterns (not free-text patient names or street addresses) and is **not** a certified HIPAA Safe Harbor or GDPR de-identification system. Real clinical deployments require dedicated clinical NER de-identification pipelines and signed Business Associate Agreements (BAAs).
 3. **No Direct Model Authority:** Neither Laya nor Jev can execute tools or write final user responses directly. All final dispositions are controlled by deterministic Python code in `src/clinguard_rag/policy.py`.
 
 ### Technical Limitations and Known Edge Cases
 1. **Offline Fixture Benchmark vs. Live Model Inference:**
    - Default evaluations use `DeterministicEvalBackend` (`data/evaluation_benchmark.json`) so tests run offline in $\sim 1\text{ second}$.
    - Live GPU latency for `convaiinnovations/laya-typed-decisions` (reported by Convai Innovations as $32.8\text{--}39.5\text{ ms}$ on an NVIDIA Tesla T4) and live commercial calls to TypeSafe AI's Jev (`POST https://api.typesafe.ai/v1/systemone`) are not executed in CI.
-   - To run `ClinGuardPipeline` on arbitrary new clinical queries end-to-end, a developer must wire `LayaLocalBackend.predict_raw()` or `SystemOneHTTPBackend.predict_raw()` into a live `predict_case` adapter and attach a System-2 LLM to generate candidate claims.
+   - `LayaLocalBackend` and `SystemOneHTTPBackend` implement `predict_case()` and `predict_raw()` using `laya==0.4.12` schemas (`criteria` for `choice` and `score`, plus parsing `noul` and dict `probabilities`) and can be wired to a live System-2 LLM for end-to-end clinical evaluation.
 2. **Retrieval `top_k = 2` Cutoff on Multi-Guideline Conflicts (`EVAL-03`):**
    - In `EVAL-03`, Stage 1 fans out across two domains (`endocrine_diabetes` and `renal_dosing_contraindications`). Stage 2 retrieves `top_k = 2` chunks: `ADA-2025-SGLT2-HF` (rank 1) and the distractor `HARDNEG-MET-HEP-02` (rank 2), while the second conflicting guideline (`FDA-LEGACY-SGLT2-2019`) lands at rank 3. Stage 3 filters out `HARDNEG-MET-HEP-02`, leaving `ADA-2025-SGLT2-HF` in `accepted_doc_ids`. Because `RULE 4` requires *at least one* cited document ID in the claim to appear in `accepted_doc_ids`, the dual-cited claim passes verification. If your application requires *every* cited document in a multi-guideline claim to be retrieved inside the top-K window, increase `top_k` from `2` to `3` or `4` in `ClinGuardPipeline`.
 3. **Small Educational Corpus:**
@@ -645,19 +645,22 @@ clinguard-laya-rag/
 │   └── run_evaluation.py                  # Reproducible 4-mode ablation & calibration benchmark
 ├── src/clinguard_rag/
 │   ├── __init__.py                        # Package exports
-│   ├── calibration.py                     # TemperatureCalibrator (NLL grid search), ECE & Brier score
+│   ├── calibration.py                     # TemperatureCalibrator (NLL grid search), ECE & Top-Label Brier score
 │   ├── debiasing.py                       # Option token budget math & bidirectional order TVD
 │   ├── decision_engine.py                 # DeterministicEvalBackend, LayaLocalBackend, SystemOneHTTPBackend
 │   ├── pipeline.py                        # ClinGuardPipeline orchestrator (4 ablation modes)
 │   ├── policy.py                          # 6 deterministic clinical policy rules
-│   ├── retriever.py                       # HybridClinicalRetriever (BM25 + Dense Cosine RRF)
+│   ├── retriever.py                       # HybridClinicalRetriever (BM25 + TF-IDF Cosine RRF)
 │   ├── router.py                          # Stage 1 triage & two-step domain fan-out router
 │   ├── schemas.py                         # Pydantic v2 models (AuditRecord, TriageDecision, etc.)
 │   └── verifier.py                        # Stage 3 evidence gate & Stage 4 3-way claim verifier
 ├── tests/
-│   ├── test_debiasing_and_calibration.py  # Unit tests for token budget, TVD drift & calibration
-│   ├── test_pipeline_and_policy.py        # End-to-end integration tests across all 10 test cases
+│   ├── test_debiasing_and_calibration.py  # Unit tests for token budget, TVD drift, calibration & PHI scrubbing
+│   ├── test_pipeline_and_policy.py        # End-to-end integration & live-adapter unit tests
 │   └── test_retriever_and_router.py       # Unit tests for hybrid RRF retrieval & 2-step routing
+├── .env.example                           # Example environment variables for optional live backends
+├── Dockerfile                             # Reproducible container image running the test suite
+├── LICENSE                                # Apache License 2.0 full text
 └── pyproject.toml                         # Dependencies, build config, and pytest settings
 ```
 </details>
@@ -668,14 +671,14 @@ clinguard-laya-rag/
 | :--- | :--- |
 | **Abstention** | Deliberately refusing to answer when retrieved evidence is missing, insufficient, or unsafe (`RULE 1` and `RULE 3`). |
 | **BM25 (Best Matching 25)** | A keyword search algorithm that scores passages based on exact word matches, adjusted for word rarity and passage length. |
-| **Brier Score** | The average squared difference between predicted probabilities and actual outcomes ($0$ or $1$). Lower means more accurate probability forecasts. |
+| **Top-Label Brier Score** | The average squared difference between the model's top-option confidence and binary correctness ($0$ or $1$). Lower means better-calibrated top predictions. |
 | **Calibration** | Adjusting model confidence scores so a predicted probability of $p$ is right roughly $p \times 100\%$ of the time. |
 | **`choice` / `score` / `noul`** | The three structured question types used by Laya and Jev: multiple-choice (`choice`), numeric scale rating (`score`), and yes/no (`noul`). |
 | **eGFR** | Estimated Glomerular Filtration Rate--a standard blood-test measure of how well a patient's kidneys are filtering waste. |
 | **Hard Negative** | A search result that shares many keywords with a query (same drug or disease) but applies to the wrong clinical context (e.g., child vs. adult dose). |
 | **Negative Log-Likelihood (NLL)** | A scoring rule that penalizes models for assigning low probability to the true class. Used here to fit temperature $T = 1.4$. |
 | **Positional Bias** | When a model changes its answer depending on the order in which multiple-choice options are listed. |
-| **Reciprocal Rank Fusion (RRF)** | A method that combines two ranked search lists (keyword + vector) by adding their rank fractions $\frac{1}{60 + \text{rank}}$. |
+| **Reciprocal Rank Fusion (RRF)** | A method that combines two ranked search lists (BM25 + TF-IDF cosine) by adding their rank fractions $\frac{1}{60 + \text{rank}}$. |
 | **System 1 / System 2** | **System 1** models make fast, single-pass structured judgments (like Laya/Jev); **System 2** models generate text token-by-token (like standard LLMs). |
 | **Temperature Scaling ($T$)** | Dividing log-probabilities by $T > 0$ before softmax. Values $T > 1$ soften overconfident scores toward uniform uncertainty. |
 | **Total Variation Distance ($\Delta_{\text{order}}$)** | Measures how much a probability distribution shifts when option order is reversed ($0.0 = \text{identical}$, $1.0 = \text{completely flipped}$). |
@@ -694,8 +697,8 @@ clinguard-laya-rag/
 7. **Chuan Guo, Geoff Pleiss, Yu Sun, Kilian Q. Weinberger:** *"On Calibration of Modern Neural Networks"*, ICML 2017 ([`proceedings.mlr.press/v70/guo17a.html`](https://proceedings.mlr.press/v70/guo17a.html)).
 
 ### Contributing & Troubleshooting
-- **`ModuleNotFoundError: No module named 'scripts'` when running `pytest`:** Ensure `scripts/__init__.py` exists and set `PYTHONPATH=src:.` (Linux/macOS) or `$env:PYTHONPATH = "$PWD\src;$PWD"` (Windows PowerShell).
+- **`ModuleNotFoundError: No module named 'scripts'` when running `pytest`:** Ensure `scripts/__init__.py` exists and `pyproject.toml` includes `pythonpath = ["src", "."]`, or set `PYTHONPATH=src:.` (Linux/macOS) / `$env:PYTHONPATH = "$PWD\src;$PWD"` (Windows PowerShell).
 - **Pull Requests:** Before submitting changes, verify that both `pytest -v` and `python scripts/run_evaluation.py` pass locally.
 
 ### License
-Licensed under the **Apache License 2.0** (see [`pyproject.toml`](pyproject.toml)).
+Licensed under the **Apache License 2.0** (see [`LICENSE`](LICENSE) and [`pyproject.toml`](pyproject.toml)).
