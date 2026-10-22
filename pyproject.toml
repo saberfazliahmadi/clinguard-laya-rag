@@ -3,28 +3,29 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "clinguard-laya-rag"
+name = "clinguard-rag"
 version = "0.1.0"
-description = "Calibrated System-1 Decision Layer (Laya / Jev) for Healthcare RAG"
+description = "Calibrated System-1 decision and verification layer for clinical RAG pipelines"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
-authors = [{name = "ClinGuard-RAG Engineering"}]
+authors = [{name = "Saber Fazliahmadi"}]
 dependencies = [
     "numpy>=1.24.0",
     "pydantic>=2.5.0",
+    "httpx>=0.25.0",
     "rank-bm25>=0.2.2",
-    "httpx>=0.26.0",
 ]
 
 [project.optional-dependencies]
 laya = [
     "laya>=0.4.8",
-    "torch>=2.1.0",
-    "transformers>=4.48.0",
 ]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.4.0",
+    "mypy>=1.8.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -33,3 +34,17 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src/clinguard_rag"]
+branch = true

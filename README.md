@@ -552,7 +552,7 @@ Adding each layer of protection steadily eliminates dangerous failures on the 10
 3. **Bidirectional Debiased Guard (`debiased_system1`):** Fixes option-order bias and filters out low-relevance passages (**$80\%$ accuracy**, **$20\%$ unsafe leakage**), but still misses guideline conflict warnings (`EVAL-03`) and leaks one borderline overconfident claim (`EVAL-09`).
 4. **Full Calibrated Guard (`clinguard_full`):** Adds temperature scaling ($T = 1.4$) and conflict preservation (`RULE 5`), achieving **$100\%$ (`10/10`) disposition accuracy** and **$0\%$ (`0/5`) unsafe claim leakage**, while steadily improving probability forecast quality (**Top-Label Brier Score** drops from $0.2158 \to 0.1773 \to 0.1668$).
 
-### 4-Mode Comparison Table ($N = 10$ Held-Out Test Cases)
+### Offline Golden-Fixture Policy & Calibration Comparison Table ($N = 10$ Held-Out Test Cases)
 
 | Pipeline Mode | Temp ($T$) | Correct Dispositions ($N=10$) | Unsafe Claims Leaked ($N=5$ unsafe) | Top-Label Brier Score ($\downarrow$ better) | Multi-Class NLL ($\downarrow$ better) | 10-Bin ECE ($\downarrow$ better) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |

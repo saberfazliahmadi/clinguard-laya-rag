@@ -70,14 +70,20 @@ def test_temperature_calibrator_fits_and_reduces_nll_and_overconfidence() -> Non
 def test_phi_redaction_and_question_dict_normalization() -> None:
     sample = (
         "Pt John Smith DOB 1961-04-03 MRN 00481923 lives 12 Elm St, "
-        "call +49 40 123456; eGFR trend 120 130 1500; a@b.com"
+        "call +49 40 123456; eGFR trend 120 130 1500; a@b.com; "
+        "tel 040 1234 5678; (555) 123-4567; 555-123-4567"
     )
     scrubbed = redact_phi_hook(sample)
-    assert "[REDACTED_EMAIL]" in scrubbed
+    assert "[REDACTED_NAME]" in scrubbed and "John Smith" not in scrubbed
+    assert "[REDACTED_ADDRESS]" in scrubbed and "12 Elm St" not in scrubbed
+    assert "[REDACTED_EMAIL]" in scrubbed and "a@b.com" not in scrubbed
     assert "[REDACTED_PHONE]" in scrubbed
+    assert "+49 40 123456" not in scrubbed
+    assert "040 1234 5678" not in scrubbed
+    assert "(555) 123-4567" not in scrubbed
+    assert "555-123-4567" not in scrubbed
     assert "[REDACTED_MRN]" in scrubbed
     assert "[REDACTED_DOB]" in scrubbed
-    assert "+49 40 123456" not in scrubbed
     assert "120 130 1500" in scrubbed
 
     q_list = [

@@ -1,6 +1,7 @@
 """System-1 decision backends (Deterministic Golden Fixtures, Local Laya SDK, and /v1/systemone HTTP)."""
 
 from __future__ import annotations
+import logging
 import os
 import re
 from abc import ABC, abstractmethod
@@ -10,19 +11,37 @@ from clinguard_rag.router import CLINICAL_DOMAIN_OPTIONS
 from clinguard_rag.schemas import RetrievedChunk
 from clinguard_rag.verifier import CLAIM_OPTIONS
 
+logger = logging.getLogger(__name__)
+
 EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 PHONE_REGEX = re.compile(
-    r"(?:\+\d{1,3}[\s\-]+\d{1,4}[\s\-]+\d{4,8}(?:[\s\-]+\d{2,6})?\b|\(\d{2,4}\)[\s\-]*\d{3,4}[\s\-]+\d{3,4}\b|\b\d{3,4}-\d{3,4}-\d{4}\b)"
+    r"(?:\+\d{1,3}[\s\-]+\d{1,4}[\s\-]+\d{4,8}(?:[\s\-]+\d{2,6})?\b"
+    r"|\b0\d{2,4}[\s\-]+\d{3,4}[\s\-]+\d{3,4}\b"
+    r"|\(\d{2,4}\)[\s\-]*\d{3,4}[\s\-]+\d{3,4}\b"
+    r"|\b\d{3,4}-\d{3,4}-\d{4}\b)"
 )
 MRN_REGEX = re.compile(r"\b(?:MRN|Medical Record Number)[:\s#\-]*[A-Za-z0-9\-]{4,15}\b", re.IGNORECASE)
 DOB_REGEX = re.compile(r"\b(?:DOB|Date of Birth)[:\s]*\d{1,4}[/\-\.]\d{1,2}[/\-\.]\d{1,4}\b", re.IGNORECASE)
+ADDRESS_REGEX = re.compile(
+    r"\b\d{1,5}\s+[A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){0,2}\s+"
+    r"(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Ln|Lane|Dr|Drive|Way|Str|Strasse)\.?\b"
+)
+PATIENT_NAME_REGEX = re.compile(
+    r"\b(?:Pt\.?|Patient[:\s]+)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
+)
 
 
 def redact_phi_hook(text: str) -> str:
-    """Illustrative regex pre-scrubbing hook for emails, phone numbers, MRNs, and DOBs."""
+    """
+    Illustrative regex pre-scrubbing hook for emails, international/local phone numbers,
+    MRNs, DOBs, street addresses, and 'Pt/Patient' prefixed names.
+    Note: Regex scrubbing is a lightweight heuristic and not a certified HIPAA/GDPR NER de-identifier.
+    """
     scrubbed = EMAIL_REGEX.sub("[REDACTED_EMAIL]", text)
     scrubbed = MRN_REGEX.sub("[REDACTED_MRN]", scrubbed)
     scrubbed = DOB_REGEX.sub("[REDACTED_DOB]", scrubbed)
+    scrubbed = ADDRESS_REGEX.sub("[REDACTED_ADDRESS]", scrubbed)
+    scrubbed = PATIENT_NAME_REGEX.sub("Pt [REDACTED_NAME]", scrubbed)
     scrubbed = PHONE_REGEX.sub("[REDACTED_PHONE]", scrubbed)
     return scrubbed
 
@@ -266,6 +285,12 @@ class SystemOneHTTPBackend(DecisionBackend):
         self.api_key = api_key or os.environ.get("LAYA_API_KEY")
         self.timeout_s = timeout_s
         self.redact_phi = redact_phi
+        if not any(h in self.base_url for h in ("localhost", "127.0.0.1")):
+            logger.warning(
+                "SystemOneHTTPBackend initialized with external endpoint (%s). "
+                "Ensure HIPAA/GDPR clinical NER de-identification is enforced upstream.",
+                self.base_url,
+            )
 
     def predict_raw(
         self,
