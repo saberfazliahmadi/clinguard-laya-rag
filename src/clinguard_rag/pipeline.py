@@ -4,6 +4,15 @@ from __future__ import annotations
 import logging
 
 logger = logging.getLogger(__name__)
+from typing import Literal
+
+AblationMode = Literal[
+    "baseline",
+    "retrieval_baseline",
+    "raw_system1",
+    "debiased_system1",
+    "clinguard_full",
+]
 from typing import Any, Dict, List, Literal, Optional
 from clinguard_rag.calibration import TemperatureCalibrator
 from clinguard_rag.decision_engine import DecisionBackend, DeterministicEvalBackend
