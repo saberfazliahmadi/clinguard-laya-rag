@@ -1,4 +1,4 @@
-﻿"""Unit tests for token budget math, bidirectional debiasing, temperature calibration, and PHI scrubbing."""
+"""Unit tests for token budget math, bidirectional debiasing, temperature calibration, and PHI scrubbing."""
 
 from __future__ import annotations
 import json
@@ -53,7 +53,6 @@ def test_temperature_calibrator_fits_and_reduces_nll_and_overconfidence() -> Non
     nll_after = multiclass_nll(dists, labels, temperature=fitted_t)
     assert nll_after < nll_before
 
-    # Compute ECE and Brier directly on the real calibration split distributions before vs. after fitting T
     conf_before, conf_after, corr = [], [], []
     for d, true_lbl in zip(dists, labels):
         pred_lbl = max(d.items(), key=lambda kv: kv[1])[0]
@@ -70,15 +69,16 @@ def test_temperature_calibrator_fits_and_reduces_nll_and_overconfidence() -> Non
 
 def test_phi_redaction_and_question_dict_normalization() -> None:
     sample = (
-        "Contact Dr. Jane at jane.doe@hospital.org or +49 40 1234 5678; "
-        "MRN: 00481923, DOB: 1961-04-03; eGFR trend 85, 90, 95."
+        "Pt John Smith DOB 1961-04-03 MRN 00481923 lives 12 Elm St, "
+        "call +49 40 123456; eGFR trend 120 130 1500; a@b.com"
     )
     scrubbed = redact_phi_hook(sample)
     assert "[REDACTED_EMAIL]" in scrubbed
     assert "[REDACTED_PHONE]" in scrubbed
     assert "[REDACTED_MRN]" in scrubbed
     assert "[REDACTED_DOB]" in scrubbed
-    assert "85, 90, 95" in scrubbed
+    assert "+49 40 123456" not in scrubbed
+    assert "120 130 1500" in scrubbed
 
     q_list = [
         {"id": "q1", "type": "choice", "question": "Pick one", "options": ["a", "b"]},
@@ -87,4 +87,5 @@ def test_phi_redaction_and_question_dict_normalization() -> None:
     norm = normalize_questions_dict(q_list)
     assert "q1" in norm
     assert norm["q1"]["instructions"] == "Pick one"
+    assert "criteria" in norm["q1"] and "options" not in norm["q1"]
     assert "criteria" in norm["q2"] and "levels" not in norm["q2"]

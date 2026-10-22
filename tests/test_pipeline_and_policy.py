@@ -1,10 +1,15 @@
-"""Integration and unit tests for ClinGuardPipeline, live DecisionBackend adapter, and Policy Engine."""
+"""Integration and unit tests for ClinGuardPipeline, LayaLocalBackend, SystemOneHTTPBackend, and Policy Engine."""
 
 from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Union
-from clinguard_rag.decision_engine import DecisionBackend, normalize_questions_dict
+from clinguard_rag.decision_engine import (
+    DecisionBackend,
+    LayaLocalBackend,
+    SystemOneHTTPBackend,
+    normalize_questions_dict,
+)
 from clinguard_rag.pipeline import ClinGuardPipeline, synthesize_extractive_claim
 from clinguard_rag.policy import apply_clinical_policy
 from clinguard_rag.retriever import HybridClinicalRetriever
@@ -16,7 +21,10 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 
 class MockLiveLayaBackend(DecisionBackend):
-    """Mock live backend returning Laya-shaped {'answers': ...} payloads and validating question schemas."""
+    """
+    Mock live backend validating exact laya==0.4.12 input question schemas ('criteria' for choice & score)
+    and returning exact laya==0.4.12 output shapes ('noul': float for noul, string-keyed dict for score).
+    """
 
     backend_name = "mock-live-laya"
     checkpoint_id = "convaiinnovations/laya-typed-decisions-mock"
@@ -32,29 +40,40 @@ class MockLiveLayaBackend(DecisionBackend):
             qtype = qspec["type"]
             assert "instructions" in qspec, f"Missing instructions in {qid}"
             if qtype == "score":
-                # Verify Laya 0.4.12 compatibility: score questions must use 'criteria'
                 assert "criteria" in qspec and isinstance(qspec["criteria"], list)
-                answers[qid] = {"probabilities": [0.80, 0.15, 0.03, 0.02]}
+                assert "levels" not in qspec
+                answers[qid] = {
+                    "type": "score",
+                    "score": 0.27,
+                    "probabilities": {"0": 0.80, "1": 0.15, "2": 0.03, "3": 0.02},
+                }
             elif qtype == "noul":
                 if qid == "prompt_attack_or_unsafe":
-                    answers[qid] = {"probability": 0.02}
+                    answers[qid] = {"type": "noul", "noul": 0.02}
                 elif qid == "guidelines_conflict_noul":
-                    answers[qid] = {"probability": 0.05}
+                    answers[qid] = {"type": "noul", "noul": 0.05}
                 else:
-                    answers[qid] = {"probability": 0.88}
+                    answers[qid] = {"type": "noul", "noul": 0.88}
             elif qtype == "choice":
-                opts = qspec["options"]
+                assert "criteria" in qspec, f"choice question {qid} must use 'criteria'"
+                assert "options" not in qspec
+                criteria = qspec["criteria"]
+                opts = list(criteria.keys()) if isinstance(criteria, dict) else list(criteria)
                 if "antimicrobial_stewardship" in opts:
                     answers[qid] = {
+                        "type": "choice",
+                        "choice": "antimicrobial_stewardship",
                         "probabilities": {
                             o: (0.76 if o == "antimicrobial_stewardship" else 0.06) for o in opts
-                        }
+                        },
                     }
                 else:
                     answers[qid] = {
+                        "type": "choice",
+                        "choice": "supported",
                         "probabilities": {
                             o: (0.86 if o == "supported" else 0.07) for o in opts
-                        }
+                        },
                     }
         return {"answers": answers}
 
@@ -86,12 +105,11 @@ def test_ablation_progression_and_calibration_improvement() -> None:
     assert summary["clinguard_full"]["multiclass_nll"] < summary["debiased_system1"]["multiclass_nll"]
 
 
-def test_live_backend_predict_case_and_direct_policy_rules() -> None:
+def test_live_backend_predict_case_and_direct_policy_rules(monkeypatch: Any) -> None:
     retriever = HybridClinicalRetriever.from_json(DATA_DIR / "clinical_guidelines_corpus.json")
     live_engine = MockLiveLayaBackend()
     pipeline = ClinGuardPipeline(retriever=retriever, engine=live_engine, mode="clinguard_full")
 
-    # Run a live case without pre-recorded raw_model_probs or candidate_claim
     live_case = {
         "case_id": "LIVE-CAP-01",
         "query": "What is the recommended oral amoxicillin dose for a 42-year-old adult with mild outpatient community-acquired pneumonia?",
@@ -101,6 +119,58 @@ def test_live_backend_predict_case_and_direct_policy_rules() -> None:
     assert audit.policy_rule_triggered == "RULE_6_VERIFIED_CITED_CLINICAL_ANSWER"
     assert "[WHO-AWARE-CAP-01]" in audit.final_response
     assert synthesize_extractive_claim([]) == ""
+
+    # Direct unit test of LayaLocalBackend with a stubbed _agent
+    local_backend = LayaLocalBackend(checkpoint_id="convaiinnovations/laya-typed-decisions")
+
+    class _StubAgent:
+        def predict(self, state: str, questions: Dict[str, Any]) -> Dict[str, Any]:
+            assert "[REDACTED_EMAIL]" in state
+            assert "criteria" in questions["q_choice"]
+            return {"answers": {"q_choice": {"type": "choice", "probabilities": {"a": 0.9, "b": 0.1}}}}
+
+    local_backend._agent = _StubAgent()
+    local_out = local_backend.predict_raw(
+        state="Email test@hospital.org",
+        questions=[{"id": "q_choice", "type": "choice", "question": "Pick", "options": ["a", "b"]}],
+    )
+    assert local_out["answers"]["q_choice"]["probabilities"]["a"] == 0.9
+
+    # Direct unit test of SystemOneHTTPBackend with monkeypatched httpx.Client
+    http_backend = SystemOneHTTPBackend(base_url="http://localhost:8000", api_key="test-key")
+    captured_payload: Dict[str, Any] = {}
+
+    class _DummyResp:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> Dict[str, Any]:
+            return {"answers": {"q_noul": {"type": "noul", "noul": 0.93}}}
+
+    class _DummyClient:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def __enter__(self) -> "_DummyClient":
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+        def post(self, url: str, json: Dict[str, Any], headers: Dict[str, str]) -> _DummyResp:
+            captured_payload["url"] = url
+            captured_payload["json"] = json
+            captured_payload["headers"] = headers
+            return _DummyResp()
+
+    monkeypatch.setattr("clinguard_rag.decision_engine.httpx.Client", _DummyClient)
+    http_out = http_backend.predict_raw(
+        state="Call +49 40 123456",
+        questions={"q_noul": {"type": "noul", "instructions": "Check"}},
+    )
+    assert http_out["answers"]["q_noul"]["noul"] == 0.93
+    assert "[REDACTED_PHONE]" in captured_payload["json"]["state"]
+    assert captured_payload["headers"]["Authorization"] == "Bearer test-key"
 
     # Direct unit test of apply_clinical_policy for emergency escalation (Rule 2)
     emergency_triage = evaluate_stage1_triage(

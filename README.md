@@ -555,7 +555,7 @@ Adding each layer of protection steadily eliminates dangerous failures on the 10
 
 ### 4-Mode Comparison Table ($N = 10$ Held-Out Test Cases)
 
-| Pipeline Mode | Temp ($T$) | Correct Dispositions ($N=10$) | Unsafe Claims Leaked ($N=5$ unsafe) | Brier Score ($\downarrow$ better) | Multi-Class NLL ($\downarrow$ better) | 10-Bin ECE ($\downarrow$ better) |
+| Pipeline Mode | Temp ($T$) | Correct Dispositions ($N=10$) | Unsafe Claims Leaked ($N=5$ unsafe) | Top-Label Brier Score ($\downarrow$ better) | Multi-Class NLL ($\downarrow$ better) | 10-Bin ECE ($\downarrow$ better) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **`baseline`** (No System-1 Guard) | `1.0` | `40.0%` (`4/10`) | `100.0%` (`5/5`) | -- | -- | -- |
 | **`raw_system1`** (Forward-Only, 2-Way, Uncalibrated) | `1.0` | `60.0%` (`6/10`) | `60.0%` (`3/5`) | `0.2158` | `0.7688` | `0.2400` |

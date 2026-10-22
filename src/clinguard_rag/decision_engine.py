@@ -1,4 +1,4 @@
-﻿"""System-1 decision backends (Deterministic Golden Fixtures, Local Laya SDK, and /v1/systemone HTTP)."""
+"""System-1 decision backends (Deterministic Golden Fixtures, Local Laya SDK, and /v1/systemone HTTP)."""
 
 from __future__ import annotations
 import os
@@ -12,7 +12,7 @@ from clinguard_rag.verifier import CLAIM_OPTIONS
 
 EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 PHONE_REGEX = re.compile(
-    r"(?:\+\d{1,3}[\s\-]?)?(?:\(\d{2,4}\)[\s\-]?|\d{2,4}[\s\-])\d{3,4}[\s\-]\d{3,4}\b"
+    r"(?:\+\d{1,3}[\s\-]+\d{1,4}[\s\-]+\d{4,8}(?:[\s\-]+\d{2,6})?\b|\(\d{2,4}\)[\s\-]*\d{3,4}[\s\-]+\d{3,4}\b|\b\d{3,4}-\d{3,4}-\d{4}\b)"
 )
 MRN_REGEX = re.compile(r"\b(?:MRN|Medical Record Number)[:\s#\-]*[A-Za-z0-9\-]{4,15}\b", re.IGNORECASE)
 DOB_REGEX = re.compile(r"\b(?:DOB|Date of Birth)[:\s]*\d{1,4}[/\-\.]\d{1,2}[/\-\.]\d{1,4}\b", re.IGNORECASE)
@@ -33,14 +33,18 @@ def normalize_questions_dict(
     """
     Normalizes a list or dict of typed System-1 questions into the keyed dictionary format
     required by Laya (`agent.predict(state=..., questions={...})`) and `/v1/systemone`.
-    Also normalizes 'score' question level definitions to use the 'criteria' key required by laya>=0.4.8.
+    Maps legacy 'options' (for choice) and 'levels' (for score) to 'criteria' as required by laya>=0.4.8.
     """
     if isinstance(questions, dict):
         out: Dict[str, Dict[str, Any]] = {}
         for qid, q in questions.items():
             q_copy = dict(q)
+            if "question" in q_copy and "instructions" not in q_copy:
+                q_copy["instructions"] = q_copy.pop("question")
             if q_copy.get("type") == "score" and "levels" in q_copy and "criteria" not in q_copy:
                 q_copy["criteria"] = q_copy.pop("levels")
+            if q_copy.get("type") == "choice" and "options" in q_copy and "criteria" not in q_copy:
+                q_copy["criteria"] = q_copy.pop("options")
             out[str(qid)] = q_copy
         return out
 
@@ -53,6 +57,8 @@ def normalize_questions_dict(
                 q_copy["instructions"] = q_copy.pop("question")
             if q_copy.get("type") == "score" and "levels" in q_copy and "criteria" not in q_copy:
                 q_copy["criteria"] = q_copy.pop("levels")
+            if q_copy.get("type") == "choice" and "options" in q_copy and "criteria" not in q_copy:
+                q_copy["criteria"] = q_copy.pop("options")
             out_list[qid] = q_copy
         return out_list
 
@@ -75,24 +81,28 @@ def _extract_answer_distribution(
 
 
 def _extract_noul_prob(resp: Dict[str, Any], qid: str, default: float = 0.0) -> float:
-    """Extracts a binary noul probability from a Laya/SystemOne response."""
+    """Extracts a binary noul probability from a Laya (`{'type': 'noul', 'noul': p}`) or SystemOne response."""
     answers = resp.get("answers", resp)
     entry = answers.get(qid, default)
     if isinstance(entry, (int, float)):
         return float(entry)
     if isinstance(entry, dict):
-        for k in ("probability", "prob", "score", "true", "yes"):
+        for k in ("noul", "probability", "prob", "score", "true", "yes"):
             if k in entry and isinstance(entry[k], (int, float)):
                 return float(entry[k])
     return default
 
 
 def _extract_score_probs(resp: Dict[str, Any], qid: str) -> List[float]:
-    """Extracts 4-level urgency probabilities [0, 1, 2, 3] from a Laya/SystemOne response."""
+    """Extracts 4-level urgency probabilities [0, 1, 2, 3] from a Laya (dict) or SystemOne (list) response."""
     answers = resp.get("answers", resp)
     entry = answers.get(qid, {})
     if isinstance(entry, dict):
         probs = entry.get("probabilities") or entry.get("distribution")
+        if isinstance(probs, dict) and len(probs) == 4:
+            ordered = [float(probs.get(str(i), probs.get(i, 0.0))) for i in range(4)]
+            s = sum(ordered) or 1.0
+            return [x / s for x in ordered]
         if isinstance(probs, list) and len(probs) == 4:
             s = sum(float(x) for x in probs) or 1.0
             return [float(x) / s for x in probs]
@@ -120,8 +130,7 @@ class DecisionBackend(ABC):
     ) -> Dict[str, Any]:
         """
         Produces the dictionary of System-1 probabilities required by Stages 1, 3, and 4.
-        If `raw_model_probs` is present in `case_record` (offline evaluation), subclasses may override;
-        otherwise executes live structured queries via `predict_raw`.
+        Uses Laya 0.4.12-compliant schema keys ('criteria' for both choice and score questions).
         """
         query = case_record["query"]
         rev_domains = list(reversed(CLINICAL_DOMAIN_OPTIONS))
@@ -144,12 +153,12 @@ class DecisionBackend(ABC):
             "domain_fwd": {
                 "type": "choice",
                 "instructions": "Select the primary clinical specialty domain for this query.",
-                "options": CLINICAL_DOMAIN_OPTIONS,
+                "criteria": CLINICAL_DOMAIN_OPTIONS,
             },
             "domain_rev": {
                 "type": "choice",
                 "instructions": "Select the primary clinical specialty domain for this query.",
-                "options": rev_domains,
+                "criteria": rev_domains,
             },
         }
         s1_resp = self.predict_raw(state=query, questions=stage1_questions)
@@ -178,12 +187,12 @@ class DecisionBackend(ABC):
                 "claim_fwd": {
                     "type": "choice",
                     "instructions": "Classify whether the candidate claim is supported, contradicted, or not_mentioned by the evidence.",
-                    "options": CLAIM_OPTIONS,
+                    "criteria": CLAIM_OPTIONS,
                 },
                 "claim_rev": {
                     "type": "choice",
                     "instructions": "Classify whether the candidate claim is supported, contradicted, or not_mentioned by the evidence.",
-                    "options": rev_claims,
+                    "criteria": rev_claims,
                 },
                 "guidelines_conflict_noul": {
                     "type": "noul",
@@ -225,7 +234,6 @@ class LayaLocalBackend(DecisionBackend):
         if self._agent is None:
             from laya import Agent  # type: ignore
 
-            # Laya >= 0.4.8 Agent.__init__ takes `model_id_or_path` as its first positional parameter
             self._agent = Agent(self.checkpoint_id)
         return self._agent
 

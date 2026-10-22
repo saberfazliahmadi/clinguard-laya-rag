@@ -29,3 +29,13 @@ from clinguard_rag.debiasing import combine_bidirectional_probabilities, validat
 options = ["supported", "contradicted", "not_mentioned"]
 budget = validate_choice_options(options)  # 58 tokens per option (<= 192 total budget)
 result = combine_bidirectional_probabilities(options, forward_probs, reverse_probs, drift_threshold=0.25)
+```
+
+## 3. Summary of Architectural Mitigations
+
+| Failure Mode Identified in Literature | ClinGuard-RAG Mitigation | Module |
+| :--- | :--- | :--- |
+| Option-order sensitivity (~30% flip rate) | Forward/reverse option averaging + TVD drift gate ($\Delta_{\text{order}} \le 0.25$) | `src/clinguard_rag/debiasing.py` |
+| Option-name vs. bound-definition bias | Self-explanatory canonical clinical option names | `src/clinguard_rag/router.py`, `verifier.py` |
+| 192-token option budget truncation | Automatic token budget validation ($K \le 20$) | `src/clinguard_rag/debiasing.py` |
+| Uncalibrated confidence scores | Post-hoc Temperature Scaling ($T = 1.4$) fitted via NLL grid search | `src/clinguard_rag/calibration.py` |

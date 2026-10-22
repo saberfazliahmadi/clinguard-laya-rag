@@ -17,13 +17,13 @@ Reproduced via `python scripts/run_evaluation.py`:
 
 | Pipeline Mode | Temp ($T$) | Disposition Accuracy (`N=10`) | Unsafe Claim Leakage (`N=5` unsafe) | Claim Judge Accuracy | Brier Score ($\downarrow$) | Multi-Class NLL ($\downarrow$) | 10-Bin ECE ($\downarrow$) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`baseline`** | `1.0` | `40.0%` (`4/10`) | `100.0%` (`5/5`) | â€” | â€” | â€” | â€” |
+| **`baseline`** | `1.0` | `40.0%` (`4/10`) | `100.0%` (`5/5`) | -- | -- | -- | -- |
 | **`raw_system1`** | `1.0` | `60.0%` (`6/10`) | `60.0%` (`3/5`) | `70.0%` (`7/10`) | `0.2158` | `0.7688` | `0.2400` |
 | **`debiased_system1`** | `1.0` | `80.0%` (`8/10`) | `20.0%` (`1/5`) | `80.0%` (`8/10`) | `0.1773` | `0.6458` | `0.2315` |
 | **`clinguard_full`** | **`1.4`** | **`100.0%` (`10/10`)** | **`0.0%` (`0/5`)** | **`80.0%` (`8/10`)** | **`0.1668`** | **`0.6251`** | `0.2574` |
 
 ### Note on Proper Scoring Rules vs. 10-Bin ECE
-Across `raw_system1` $\to$ `debiased_system1` $\to$ `clinguard_full`, strictly proper scoring rules improve monotonically: **Brier Score** decreases from `0.2158` $\to$ `0.1773` $\to$ `0.1668`, and **Multi-Class NLL** decreases from `0.7688` $\to$ `0.6458` $\to$ `0.6251`. Temperature scaling ($T = 1.4$) cools the overconfident unsupported claim in `EVAL-09` from `0.7600` down to `0.6519 < 0.75`, eliminating the final unsafe claim leak. Because cooling also shifts high-confidence true positives on this small 10-case sample into the `0.80â€“0.86` confidence bin where empirical accuracy is `1.00`, 10-bin equal-width ECE increases slightly from `0.2315` to `0.2574`.
+Across `raw_system1` $\to$ `debiased_system1` $\to$ `clinguard_full`, strictly proper scoring rules improve monotonically: **Brier Score** decreases from `0.2158` $\to$ `0.1773` $\to$ `0.1668`, and **Multi-Class NLL** decreases from `0.7688` $\to$ `0.6458` $\to$ `0.6251`. Temperature scaling ($T = 1.4$) cools the overconfident unsupported claim in `EVAL-09` from `0.7600` down to `0.6519 < 0.75`, eliminating the final unsafe claim leak. Because cooling also shifts high-confidence true positives on this small 10-case sample into the `0.80--0.86` confidence bin where empirical accuracy is `1.00`, 10-bin equal-width ECE increases slightly from `0.2315` to `0.2574`.
 
 ## 3. Limitations
 1. **Fixture-Based Policy & Calibration Verification:** The benchmark replays structured probability fixtures (`DeterministicEvalBackend`) to test policy and calibration math deterministically in CI without requiring GPU weights.

@@ -1,10 +1,10 @@
-# Phase 1: Document Analysis â€” Laya, Jev, and System 1 Decision Models for Healthcare RAG
+# Phase 1: Document Analysis -- Laya, Jev, and System 1 Decision Models for Healthcare RAG
 
 ## 1. Corpus Overview
 Seven PDF documents were analyzed, representing six unique primary sources published between September 23, 2026, and October 12, 2026 (Documents 3 and 6 are identical copies of Celia Lozano Grijalba's LinkedIn article):
 1. **Eva Wong (reviewed by Kristian Sundet), ZimaSpace (Sep 24, 2026):** *Jev vs Laya: Hosted Decision API vs Open-Source Local Model (2026)*.
 2. **Vishal Mysore, Medium (Sep 26, 2026):** *What Is Laya? Laya vs Jev, with Live Demo!!*.
-3. **Celia Lozano Grijalba, DataPills / LinkedIn (Sep 27, 2026):** *DataPills â€” Jev opened the door. Laya made it open* (provided twice).
+3. **Celia Lozano Grijalba, DataPills / LinkedIn (Sep 27, 2026):** *DataPills -- Jev opened the door. Laya made it open* (provided twice).
 4. **Nilay Baranwal, LinkedIn (Sep 23, 2026):** *Jev vs Laya: Decision Models* (including practitioner commentary and benchmark critiques).
 5. **Vinayak Kale, LinkedIn (Sep 26, 2026):** *Jev, Kev and Laya explained* (including ecosystem tool links in comments).
 6. **Kevin Gatimu, LinkedIn (Oct 12, 2026):** *My OpenSource contribution to Laya (System 1 decision model)*.
@@ -36,7 +36,7 @@ Seven PDF documents were analyzed, representing six unique primary sources publi
 ### 2.4 Related Ecosystem Technologies
 * **Kev (`github.com/jaredpalmer/kev`):** Created by Jared Palmer; an Apache 2.0 family of local-first, Qwen-based decision models in `0.8B`, `4B`, and `9B` parameter sizes capable of running locally on a MacBook Pro (with separate dataset licensing considerations noted in its repository).
 * **Decider (`github.com/Mapika/decider`):** Created by Mark Marosi (Mapika); an independent Qwen-based Apache 2.0 project providing typed decisions.
-* **Jul (`github.com/usejul/jul`):** "Juste un LLM" â€” an open wrapper matching the Jev SDK interface that runs zero-shot on local hardware using an open LLM of choice without fine-tuning.
+* **Jul (`github.com/usejul/jul`):** "Juste un LLM" -- an open wrapper matching the Jev SDK interface that runs zero-shot on local hardware using an open LLM of choice without fine-tuning.
 * **layaMOE & Browser Port Suite (Vishal Mysore):** Unofficial ONNX Runtime Web / WebAssembly implementations including `layaForWeb` (int8/int4 browser port), `layaMOE` (frozen shared Laya encoder + 26.5M-parameter domain expert heads + Laya router question), `layaForWorkflows` (decision-graph routing), `layaAsRagJudge` (in-browser RAG claim verification), and `layaAgent` (System 1 + System 2 browser guard).
 * **laya-cli (`github.com/Mlt9/laya-cli`):** Ergonomic CLI for Laya with streaming batch mode.
 * **cortex-1-large:** Fine-tuned Laya evaluation repository by Mukti Mishra publishing per-decision CSV logs (`matched_jev_head_to_head.csv`).
@@ -62,7 +62,7 @@ Laya is a family of three checkpoints paired with a local `Router`:
 * **Multi-Question Parallelism:** Multiple questions concerning the same input state are evaluated in a single non-autoregressive forward pass.
 
 ### 3.3 Training Objective (RLCD) & Calibration
-* **Reinforcement Learning for Calibrated Decisions (RLCD):** Both TypeSafe (Jev) and Convai Innovations (Laya) reference RLCD. Laya trains via reinforcement learning against **strictly proper scoring rules**â€”specifically log and spherical scoring rules for categorical choices/propositions, plus the **ranked probability score (RPS)** for ordinal `score` questionsâ€”where expected reward is mathematically maximized only when the model reports honest probabilities matching empirical frequencies.
+* **Reinforcement Learning for Calibrated Decisions (RLCD):** Both TypeSafe (Jev) and Convai Innovations (Laya) reference RLCD. Laya trains via reinforcement learning against **strictly proper scoring rules**--specifically log and spherical scoring rules for categorical choices/propositions, plus the **ranked probability score (RPS)** for ordinal `score` questions--where expected reward is mathematically maximized only when the model reports honest probabilities matching empirical frequencies.
 * **Post-Hoc Temperature Scaling:** Out of the box, Laya checkpoints are overconfident (base model mean ECE is `0.466` before scaling). Laya fits a temperature parameter per `(question type, option count)` on held-out calibration data, reducing ECE to `0.081` on its evaluation suite.
 
 ---
@@ -80,7 +80,7 @@ Laya is a family of three checkpoints paired with a local `Router`:
 | **ECE (After Temperature Fitting)** | `0.081` (vs `0.466` unfitted) | `0.246` | Requires fitting temperature per `(question type, option count)` on target validation data. |
 | **`Banking77` (77 / 72 labels)** | `0.425` | `0.870` | Laya degrades sharply when option count exceeds ~20 due to its 192-token option budget. |
 | **Anthus AI Paired Benchmark** | `0.722` (base) -> `0.896` (fine-tuned on 140 labels) | `0.788` (base) -> `0.870` (with feedback layer) | 140-label fine-tune took ~100s on M1 Max, but shifted 42% of answers on 8 untrained questions. |
-| **Single-Decision Latency** | `32.8 ms` (multilingual) â€“ `39.5 ms` (English) on local Tesla T4 | `236â€“276 ms` p50 via hosted API | Batched (10 questions on T4): `72.3 ms` (multilingual) / `158.6 ms` (English), or `~7.2 ms` per question. Local GPU vs network API round-trip. |
+| **Single-Decision Latency** | `32.8 ms` (multilingual) -- `39.5 ms` (English) on local Tesla T4 | `236--276 ms` p50 via hosted API | Batched (10 questions on T4): `72.3 ms` (multilingual) / `158.6 ms` (English), or `~7.2 ms` per question. Local GPU vs network API round-trip. |
 | **RAG Claim Verification (`layaAsRagJudge`)** | `75%` accuracy, `0.80` AUROC | Not tested in experiment | Tested by Vishal Mysore on 72 hand-written claims with in-browser retrieval. |
 
 ---
@@ -103,13 +103,13 @@ Laya is a family of three checkpoints paired with a local `Router`:
 
 ## 6. Applications to Healthcare Retrieval-Augmented Generation (RAG)
 
-The reviewed documents establish both a direct healthcare RAG precedentâ€”Kevin Gatimu's on-premises health-record RAG system using Laya so sensitive clinical data never leaves the facility and hallucinated control decisions are eliminatedâ€”and concrete architectural patterns for integrating Laya into a healthcare RAG pipeline:
+The reviewed documents establish both a direct healthcare RAG precedent--Kevin Gatimu's on-premises health-record RAG system using Laya so sensitive clinical data never leaves the facility and hallucinated control decisions are eliminated--and concrete architectural patterns for integrating Laya into a healthcare RAG pipeline:
 
 1. **Privacy-Preserving Local Triage & Query Routing (Pre-Retrieval):**
-   * Before any patient query or clinical note leaves local hospital infrastructure, a local Laya model can classify clinical intent (`choice`, kept under 20 options), estimate clinical urgency/acuity (`score`), and flag out-of-scope or unsafe requests (`noul`) in ~33â€“40 ms on GPU (or local CPU/ONNX).
+   * Before any patient query or clinical note leaves local hospital infrastructure, a local Laya model can classify clinical intent (`choice`, kept under 20 options), estimate clinical urgency/acuity (`score`), and flag out-of-scope or unsafe requests (`noul`) in ~33--40 ms on GPU (or local CPU/ONNX).
    * Ambiguous or out-of-distribution queries can be routed to an explicit `unclear`/`escalate` branch rather than forced into a wrong clinical queue.
 2. **Retrieved Evidence Relevance & Sufficiency Gate (Post-Retrieval / Pre-Generation):**
-   * Since English Laya has a `512`â€“`1,024` token context limit, it naturally fits evaluating individual retrieved clinical guideline chunks or short evidence passages against a clinical question.
+   * Since English Laya has a `512`--1,024` token context limit, it naturally fits evaluating individual retrieved clinical guideline chunks or short evidence passages against a clinical question.
    * Using `score` (evidence relevance rubric) and `noul` ("Does this retrieved passage contain sufficient evidence to answer the query?"), Laya can filter irrelevant chunks and halt LLM generation if retrieval evidence is insufficient, preventing ungrounded synthesis.
 3. **Claim Verification & Hallucination Guard (`layaAsRagJudge` Pattern, Post-Generation):**
    * Following Vishal Mysore's `layaAsRagJudge` experiment (`75%` accuracy, `0.80` AUROC on claim verification), a generative LLM ("System 2") can draft a cited clinical response while Laya ("System 1") evaluates each generated claim against its cited source passage via `noul` entailment/contradiction checks.
