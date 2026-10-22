@@ -134,7 +134,7 @@ def _extract_score_probs(resp: dict[str, Any], qid: str) -> list[float]:
     if isinstance(entry, dict):
         probs = entry.get("probabilities") or entry.get("distribution")
         if isinstance(probs, dict) and len(probs) == 4:
-            ordered = [float(probs.get(str(i), probs.get(i, 0.0))) for i in range(4)]
+            ordered = [float(probs.get(str(i)) or probs.get(i) or 0.0) for i in range(4)]
             s = sum(ordered) or 1.0
             return [x / s for x in ordered]
         if isinstance(probs, list) and len(probs) == 4:

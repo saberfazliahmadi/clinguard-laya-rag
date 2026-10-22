@@ -1,10 +1,28 @@
-"""End-to-end ClinGuard-RAG pipeline orchestrating Stages 1 through 5."""
+"""End-to-end 5-Stage ClinGuard-RAG Orchestrator supporting ablation modes."""
 
 from __future__ import annotations
+
 import logging
-from typing import Literal
+import re
+from typing import Any, Dict, List, Literal, Optional
+
+from clinguard_rag.calibration import TemperatureCalibrator
+from clinguard_rag.decision_engine import DecisionBackend, DeterministicEvalBackend
+from clinguard_rag.policy import apply_clinical_policy
+from clinguard_rag.retriever import HybridClinicalRetriever
+from clinguard_rag.router import run_stage1_triage
+from clinguard_rag.schemas import AuditRecord, ClinicalDisposition, RetrievedChunk
+from clinguard_rag.verifier import filter_retrieved_chunks, verify_clinical_claim
 
 logger = logging.getLogger(__name__)
+
+AblationMode = Literal[
+    "baseline",
+    "retrieval_baseline",
+    "raw_system1",
+    "debiased_system1",
+    "clinguard_full",
+]
 
 _STOPWORDS = {
     "what", "when", "where", "which", "should", "with", "from", "that", "this",
@@ -15,8 +33,6 @@ _STOPWORDS = {
 
 def _query_lexical_overlap(query: str, chunk: RetrievedChunk) -> float:
     """Computes fraction of informative query terms present in the candidate chunk."""
-    import re
-
     q_tokens = {
         t for t in re.findall(r"[a-z0-9]+", query.lower())
         if len(t) >= 4 and t not in _STOPWORDS
@@ -29,23 +45,7 @@ def _query_lexical_overlap(query: str, chunk: RetrievedChunk) -> float:
     return len(q_tokens & doc_tokens) / len(q_tokens)
 
 
-AblationMode = Literal[
-    "baseline",
-    "retrieval_baseline",
-    "raw_system1",
-    "debiased_system1",
-    "clinguard_full",
-]
-from typing import Any, Dict, List, Literal, Optional
-from clinguard_rag.calibration import TemperatureCalibrator
-from clinguard_rag.decision_engine import DecisionBackend, DeterministicEvalBackend
-from clinguard_rag.policy import apply_clinical_policy
-from clinguard_rag.retriever import HybridClinicalRetriever
-from clinguard_rag.router import run_stage1_triage
-from clinguard_rag.schemas import AuditRecord, ClinicalDisposition, RetrievedChunk
-from clinguard_rag.verifier import filter_retrieved_chunks, verify_clinical_claim
-
-PipelineMode = Literal["baseline", "raw_system1", "debiased_system1", "clinguard_full"]
+PipelineMode = Literal["baseline", "retrieval_baseline", "raw_system1", "debiased_system1", "clinguard_full"]
 
 
 def synthesize_extractive_claim(accepted_chunks: List[RetrievedChunk]) -> str:
@@ -57,6 +57,8 @@ def synthesize_extractive_claim(accepted_chunks: List[RetrievedChunk]) -> str:
 
 
 class ClinGuardPipeline:
+    retrieval_overlap_threshold: float = 0.25
+
     """5-stage clinical RAG pipeline with configurable ablation modes."""
 
     def __init__(
