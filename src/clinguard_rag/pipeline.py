@@ -65,7 +65,7 @@ class ClinGuardPipeline:
             triage = run_stage1_triage(raw_probs, temperature=1.0, use_bidirectional=False)
             retrieved_ids = [r.chunk.doc_id for r in prelim_chunks]
             accepted_ids = [
-                r.chunk.doc_id for r in prelim_chunks if r.cosine_score >= 0.22 and r.bm25_score > 0.0
+                r.chunk.doc_id for r in prelim_chunks if r.rrf_score >= 0.032
             ]
             candidate_claim = case_record.get("candidate_claim") or synthesize_extractive_claim(prelim_chunks)
             if not accepted_ids:
