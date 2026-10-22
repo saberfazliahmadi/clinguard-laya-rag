@@ -62,7 +62,7 @@ class ClinGuardPipeline:
         raw_probs = self.engine.predict_case(case_record, retrieved_chunks=prelim_chunks)
 
         if self.mode == "retrieval_baseline":
-            triage = evaluate_stage1_triage(raw_probs, temperature=1.0, use_bidirectional=False)
+            triage = run_stage1_triage(raw_probs, temperature=1.0, use_bidirectional=False)
             retrieved_ids = [r.chunk.doc_id for r in prelim_chunks]
             accepted_ids = [
                 r.chunk.doc_id for r in prelim_chunks if r.cosine_score >= 0.22 and r.bm25_score > 0.0
