@@ -79,6 +79,7 @@ class ClinGuardPipeline:
     def run_case(self, case_record: Dict[str, Any]) -> AuditRecord:
         case_id = case_record.get("case_id", "LIVE-01")
         query = case_record["query"]
+        logger.debug("Running case %s in mode %s", case_id, self.mode)
 
         # Pre-retrieve candidate chunks for live backends that do not include raw_model_probs
         prelim_chunks = self.retriever.retrieve(query=query, allowed_domains=None, top_k=2)
@@ -92,8 +93,7 @@ class ClinGuardPipeline:
             ]
             candidate_claim = case_record.get("candidate_claim") or synthesize_extractive_claim(prelim_chunks)
             if not accepted_ids:
-                logger.debug('Emitting AuditRecord for case %s in mode %s', case_id, self.mode)
-        return AuditRecord(
+                return AuditRecord(
                     case_id=case_id,
                     query=query,
                     engine_backend=self.engine.backend_name,
