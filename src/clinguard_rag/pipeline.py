@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 import logging
+from typing import Literal
 
 logger = logging.getLogger(__name__)
-from typing import Literal
 
 AblationMode = Literal[
     "baseline",
@@ -22,8 +22,7 @@ from clinguard_rag.router import run_stage1_triage
 from clinguard_rag.schemas import AuditRecord, ClinicalDisposition, RetrievedChunk
 from clinguard_rag.verifier import filter_retrieved_chunks, verify_clinical_claim
 
-PipelineMode = Literal["baseline",
-    "retrieval_baseline", "raw_system1", "debiased_system1", "clinguard_full"]
+PipelineMode = Literal["baseline", "raw_system1", "debiased_system1", "clinguard_full"]
 
 
 def synthesize_extractive_claim(accepted_chunks: List[RetrievedChunk]) -> str:
@@ -63,13 +62,15 @@ class ClinGuardPipeline:
         raw_probs = self.engine.predict_case(case_record, retrieved_chunks=prelim_chunks)
 
         if self.mode == "retrieval_baseline":
-            retrieved_ids = [r.chunk.doc_id for r in retrieved]
+            triage = evaluate_stage1_triage(raw_probs, temperature=1.0, use_bidirectional=False)
+            retrieved_ids = [r.chunk.doc_id for r in prelim_chunks]
             accepted_ids = [
-                r.chunk.doc_id for r in retrieved if r.cosine_score >= 0.22 and r.bm25_score > 0.0
+                r.chunk.doc_id for r in prelim_chunks if r.cosine_score >= 0.22 and r.bm25_score > 0.0
             ]
+            candidate_claim = case_record.get("candidate_claim") or synthesize_extractive_claim(prelim_chunks)
             if not accepted_ids:
                 return AuditRecord(
-                    case_id=case_record["case_id"],
+                    case_id=case_id,
                     query=query,
                     engine_backend=self.engine.backend_name,
                     checkpoint_id=self.engine.checkpoint_id,
@@ -83,7 +84,7 @@ class ClinGuardPipeline:
                     final_response="ABSTAIN: Top retrieval similarity score below threshold.",
                 )
             return AuditRecord(
-                case_id=case_record["case_id"],
+                case_id=case_id,
                 query=query,
                 engine_backend=self.engine.backend_name,
                 checkpoint_id=self.engine.checkpoint_id,
