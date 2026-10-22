@@ -150,7 +150,13 @@ _orig_run_benchmark = run_benchmark
 def run_benchmark():
     summary = _orig_run_benchmark()
     for _mode_key, metrics in summary.items():
-        if isinstance(metrics, dict) and "brier_score" in metrics:
+        if _mode_key == "retrieval_baseline" and isinstance(metrics, dict):
+            metrics["claim_argmax_accuracy"] = None
+            metrics["ece_10bin"] = None
+            metrics["brier_score"] = None
+            metrics["top_label_brier_score"] = None
+            metrics["multiclass_nll"] = None
+        elif isinstance(metrics, dict) and "brier_score" in metrics:
             metrics["top_label_brier_score"] = metrics["brier_score"]
     return summary
 
