@@ -1,5 +1,7 @@
 # Phase 1: Document Analysis -- Laya, Jev, and System 1 Decision Models for Healthcare RAG
 
+> **Evaluation Scope Note:** All benchmark metrics in this repository represent a deterministic **policy-logic test on offline golden fixtures** (`data/evaluation_benchmark.json`) for the System-1 decision layer.
+
 ## 1. Corpus Overview
 Seven PDF documents were analyzed, representing six unique primary sources published between September 23, 2026, and October 12, 2026 (Documents 3 and 6 are identical copies of Celia Lozano Grijalba's LinkedIn article):
 1. **Eva Wong (reviewed by Kristian Sundet), ZimaSpace (Sep 24, 2026):** *Jev vs Laya: Hosted Decision API vs Open-Source Local Model (2026)*.

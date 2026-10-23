@@ -57,7 +57,7 @@ def synthesize_extractive_claim(accepted_chunks: list[RetrievedChunk]) -> str:
 
 
 class ClinGuardPipeline:
-    retrieval_overlap_threshold: float = 0.25
+    retrieval_overlap_threshold: float = 0.0
 
     """5-stage clinical RAG pipeline with configurable ablation modes."""
 
@@ -74,9 +74,51 @@ class ClinGuardPipeline:
         self.calibrator = TemperatureCalibrator(temperature=temperature)
 
     def fit_calibration(self, calibration_cases: list[dict[str, Any]]) -> float:
-        dists = [c["raw_model_probs"]["claim_fwd"] for c in calibration_cases]
-        labels = [c["claim_label"] for c in calibration_cases]
-        return self.calibrator.fit(dists, labels)
+        """
+        Fits post-hoc temperature T on the calibration split for clinguard_full,
+        or selects the lexical-overlap threshold on the calibration split for retrieval_baseline.
+        """
+        if self.mode == "retrieval_baseline":
+            best_t = 0.25
+            best_acc = -1.0
+            for cand_t in (0.25, 0.30, 0.35, 0.40, 0.50):
+                hits = 0
+                for c in calibration_cases:
+                    chunks = self.retriever.retrieve(query=c["query"], allowed_domains=None, top_k=2)
+                    acc = [r for r in chunks if _query_lexical_overlap(c["query"], r) >= cand_t]
+                    want_serve = c["expected_disposition"] in (
+                        ClinicalDisposition.SERVE_VERIFIED_CITED_ANSWER.value,
+                        ClinicalDisposition.SERVE_WITH_CONFLICT_WARNING.value,
+                    )
+                    if bool(acc) == want_serve:
+                        hits += 1
+                score = hits / max(1, len(calibration_cases))
+                if score > best_acc:
+                    best_acc = score
+                    best_t = cand_t
+            self.retrieval_overlap_threshold = best_t
+            logger.info(
+                "Fitted retrieval_baseline overlap threshold=%.2f on %d calibration cases (cal_acc=%.2f)",
+                best_t,
+                len(calibration_cases),
+                best_acc,
+            )
+            self.calibrator.temperature = 1.0
+            return best_t
+
+        if self.mode != "clinguard_full":
+            self.calibrator.temperature = 1.0
+            return 1.0
+
+        forward_dists = []
+        labels = []
+        for c in calibration_cases:
+            probs = self.engine.predict_case(c)
+            forward_dists.append(probs["claim_fwd"])
+            labels.append(c["claim_label"])
+        fitted_t = self.calibrator.fit(forward_dists, labels)
+        logger.info("Fitted post-hoc temperature T=%.2f on %d calibration cases", fitted_t, len(calibration_cases))
+        return fitted_t
 
     def run_case(self, case_record: dict[str, Any]) -> AuditRecord:
         case_id = case_record.get("case_id", "LIVE-01")

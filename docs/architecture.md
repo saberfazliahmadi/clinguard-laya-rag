@@ -1,5 +1,7 @@
 # ClinGuard-RAG System Architecture
 
+> **Evaluation Scope Note:** All benchmark metrics in this repository represent a deterministic **policy-logic test on offline golden fixtures** (`data/evaluation_benchmark.json`) for the System-1 decision layer.
+
 ## 1. Architectural Overview
 
 `ClinGuard-RAG` decouples free-text generation (System-2) from structured clinical safety governance (System-1). Rather than relying on an autoregressive LLM to self-police retrieval relevance, dosing safety, and citation grounding, the pipeline surrounds hybrid search with fast, single-pass System-1 decision checkpoints (`choice`, `score`, `noul`) and a deterministic Python policy engine.

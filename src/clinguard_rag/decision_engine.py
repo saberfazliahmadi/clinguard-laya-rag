@@ -47,7 +47,11 @@ PERSON_NAME_REGEX = re.compile(
 )
 CLINICAL_SUBJECT_NAME_REGEX = re.compile(
     r"\b([A-Z][a-z]{2,15}\s+[A-Z][a-z]{2,15})\s+"
-    r"(?=presented|presents|admitted|complains|reported|reports|called|arrived|visited|underwent\b)"
+    r"(?=(?:presented|presents|admitted|complains|reported|reports|called|arrived|visited|underwent|"
+    r"was\s+(?:seen|admitted|evaluated|treated|discharged|diagnosed|referred)|"
+    r"is\s+(?:stable|unstable|a\s+\d+|currently|admitted)|"
+    r"has\s+(?:a\s+history|been|severe|acute|chronic)|"
+    r"denies|developed|received)\b)"
 )
 
 

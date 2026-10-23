@@ -33,7 +33,7 @@ jobs:
 
       - name: Run pytest suite with coverage
         run: |
-          PYTHONPATH=src:. pytest -v --cov=clinguard_rag --cov-report=term-missing
+          PYTHONPATH=src:. pytest -v --cov=clinguard_rag --cov-report=term-missing --cov-fail-under=85
 
       - name: Run deterministic evaluation benchmark and CLI smoke check
         run: |

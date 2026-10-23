@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from clinguard_rag.schemas import ClaimVerification, ClinicalDisposition, TriageDecision
 
 

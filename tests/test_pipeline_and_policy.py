@@ -105,8 +105,10 @@ def test_ablation_progression_and_calibration_improvement() -> None:
     retriever = HybridClinicalRetriever.from_json(DATA_DIR / "clinical_guidelines_corpus.json")
     cases = json.loads((DATA_DIR / "evaluation_benchmark.json").read_text(encoding="utf-8"))
     rb_pipe = ClinGuardPipeline(retriever=retriever, mode="retrieval_baseline")
-    rb_pipe.fit_calibration([c for c in cases if c["split"] == "calibration"])
-    assert 0.20 <= rb_pipe.retrieval_overlap_threshold <= 0.50
+    assert rb_pipe.retrieval_overlap_threshold == 0.0
+    fitted_overlap = rb_pipe.fit_calibration([c for c in cases if c["split"] == "calibration"])
+    assert fitted_overlap == 0.25
+    assert rb_pipe.retrieval_overlap_threshold == 0.25
     assert summary["raw_system1"]["disposition_accuracy"] == 0.6
     assert summary["debiased_system1"]["disposition_accuracy"] == 0.8
     assert summary["clinguard_full"]["disposition_accuracy"] == 1.0

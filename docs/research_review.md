@@ -1,5 +1,7 @@
 # Literature & Technical Research Review
 
+> **Evaluation Scope Note:** All benchmark metrics in this repository represent a deterministic **policy-logic test on offline golden fixtures** (`data/evaluation_benchmark.json`) for the System-1 decision layer.
+
 ## 1. Primary System-1 Decision Model Sources
 
 1. **Laya Open-Weight Decision Engine (Convai Innovations):**

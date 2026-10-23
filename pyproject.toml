@@ -52,3 +52,7 @@ ignore_missing_imports = true
 [tool.coverage.run]
 source = ["src/clinguard_rag"]
 branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
