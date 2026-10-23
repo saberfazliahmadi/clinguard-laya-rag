@@ -10,6 +10,8 @@ from clinguard_rag.calibration import apply_temperature_to_binary, apply_tempera
 from clinguard_rag.debiasing import combine_bidirectional_probabilities
 from clinguard_rag.schemas import ClaimVerification, DebiasedChoiceResult, RetrievedChunk
 
+logger = logging.getLogger(__name__)
+
 CLAIM_OPTIONS: list[str] = ["supported", "contradicted", "not_mentioned"]
 CITATION_PATTERN = re.compile(r"\[([A-Z0-9\-]+)\]")
 
@@ -100,9 +102,5 @@ def verify_clinical_claim(
         verdict=verdict,
         guidelines_conflict_prob=round(conflict_prob, 4),
     )
-
-logger = logging.getLogger(__name__)
-
-
 # Alias for evaluation script compatibility
 CLAIM_VERIFICATION_OPTIONS_3WAY = CLAIM_OPTIONS

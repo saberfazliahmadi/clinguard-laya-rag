@@ -6,6 +6,8 @@ import logging
 
 from clinguard_rag.schemas import ClaimVerification, ClinicalDisposition, TriageDecision
 
+logger = logging.getLogger(__name__)
+
 
 def apply_clinical_policy(
     triage: TriageDecision,
@@ -83,5 +85,3 @@ def apply_clinical_policy(
         "RULE_6_VERIFIED_CITED_CLINICAL_ANSWER",
         verification.claim_text,
     )
-
-logger = logging.getLogger(__name__)

@@ -12,6 +12,8 @@ from clinguard_rag.calibration import (
 from clinguard_rag.debiasing import combine_bidirectional_probabilities
 from clinguard_rag.schemas import DebiasedChoiceResult, TriageDecision
 
+logger = logging.getLogger(__name__)
+
 CLINICAL_DOMAIN_OPTIONS: list[str] = [
     "antimicrobial_stewardship",
     "cardiovascular_hypertension",
@@ -96,6 +98,7 @@ def evaluate_stage1_triage(
     else:
         routed_domains = []
 
+    logger.debug("Stage 1 triage completed: routed_domains=%s, skip_retrieval=%s", routed, skip_retrieval)
     return TriageDecision(
         prompt_attack_prob=round(attack_prob, 4),
         urgency_expected_score=round(expected_urgency, 4),
@@ -104,9 +107,5 @@ def evaluate_stage1_triage(
         routed_domains=routed_domains,
         skip_retrieval=skip,
     )
-
-logger = logging.getLogger(__name__)
-
-
 # Alias to support both function names across pipeline and tests
 run_stage1_triage = evaluate_stage1_triage

@@ -42,16 +42,17 @@ ADDRESS_REGEX = re.compile(
 )
 PERSON_NAME_REGEX = re.compile(
     r"\b(Pt\.?|Patient:?|Dr\.?|Doctor|Prof\.?|Mr\.?|Mrs\.?|Ms\.?|"
-    r"husband|wife|mother|father|son|daughter|brother|sister|partner|spouse)\s+"
-    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
+    r"husband|wife|mother|father|son|daughter|brother|sister|partner|spouse|Contact|contact)\s+"
+    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}?)(?=\s+(?:at|in|on|by|from|for|with|was|is|has|had|takes|called|reviewed)\b|[,;\.]|$)"
 )
 CLINICAL_SUBJECT_NAME_REGEX = re.compile(
-    r"\b([A-Z][a-z]{2,15}\s+[A-Z][a-z]{2,15})\s+"
-    r"(?=(?:presented|presents|admitted|complains|reported|reports|called|arrived|visited|underwent|"
+    r"\b([A-Z][a-z]{2,15}\s+[A-Z][a-z]{2,15})"
+    r"(?=\s*,\s*(?:\d{1,3}(?:\s*(?:y/o|yo|years\s+old))?\s*,|DOB\b|\[REDACTED_DOB\])"
+    r"|\s+(?:presented|presents|admitted|complains|reported|reports|called|arrived|visited|underwent|"
+    r"takes|took|started|stopped|requires|needs|denies|developed|received|"
     r"was\s+(?:seen|admitted|evaluated|treated|discharged|diagnosed|referred)|"
     r"is\s+(?:stable|unstable|a\s+\d+|currently|admitted)|"
-    r"has\s+(?:a\s+history|been|severe|acute|chronic)|"
-    r"denies|developed|received)\b)"
+    r"has\b|had\b))"
 )
 
 
@@ -66,7 +67,7 @@ def redact_phi_hook(text: str) -> str:
     scrubbed = DOB_REGEX.sub("[REDACTED_DOB]", scrubbed)
     scrubbed = ADDRESS_REGEX.sub("[REDACTED_ADDRESS]", scrubbed)
     scrubbed = PERSON_NAME_REGEX.sub(r"\1 [REDACTED_NAME]", scrubbed)
-    scrubbed = CLINICAL_SUBJECT_NAME_REGEX.sub("[REDACTED_NAME] ", scrubbed)
+    scrubbed = CLINICAL_SUBJECT_NAME_REGEX.sub("[REDACTED_NAME]", scrubbed)
     scrubbed = PHONE_REGEX.sub("[REDACTED_PHONE]", scrubbed)
     return scrubbed
 
