@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from clinguard_rag.calibration import TemperatureCalibrator
 from clinguard_rag.decision_engine import DecisionBackend, DeterministicEvalBackend
@@ -48,7 +48,7 @@ def _query_lexical_overlap(query: str, chunk: RetrievedChunk) -> float:
 PipelineMode = Literal["baseline", "retrieval_baseline", "raw_system1", "debiased_system1", "clinguard_full"]
 
 
-def synthesize_extractive_claim(accepted_chunks: List[RetrievedChunk]) -> str:
+def synthesize_extractive_claim(accepted_chunks: list[RetrievedChunk]) -> str:
     """Deterministic extractive fallback claim generator when no fixture candidate_claim is provided."""
     if not accepted_chunks:
         return ""
@@ -64,7 +64,7 @@ class ClinGuardPipeline:
     def __init__(
         self,
         retriever: HybridClinicalRetriever,
-        engine: Optional[DecisionBackend] = None,
+        engine: DecisionBackend | None = None,
         mode: PipelineMode = "clinguard_full",
         temperature: float = 1.0,
     ) -> None:
@@ -73,12 +73,12 @@ class ClinGuardPipeline:
         self.mode = mode
         self.calibrator = TemperatureCalibrator(temperature=temperature)
 
-    def fit_calibration(self, calibration_cases: List[Dict[str, Any]]) -> float:
+    def fit_calibration(self, calibration_cases: list[dict[str, Any]]) -> float:
         dists = [c["raw_model_probs"]["claim_fwd"] for c in calibration_cases]
         labels = [c["claim_label"] for c in calibration_cases]
         return self.calibrator.fit(dists, labels)
 
-    def run_case(self, case_record: Dict[str, Any]) -> AuditRecord:
+    def run_case(self, case_record: dict[str, Any]) -> AuditRecord:
         case_id = case_record.get("case_id", "LIVE-01")
         query = case_record["query"]
         logger.debug("Running case %s in mode %s", case_id, self.mode)
@@ -95,7 +95,7 @@ class ClinGuardPipeline:
             ]
             candidate_claim = case_record.get("candidate_claim") or synthesize_extractive_claim(prelim_chunks)
             if not accepted_ids:
-            logger.info("Case %s abstained at Stage 3 evidence gate (0 chunks accepted)", case_id)
+                logger.info("Case %s abstained under retrieval_baseline (0 chunks accepted)", case_id)
                 return AuditRecord(
                     case_id=case_id,
                     query=query,
