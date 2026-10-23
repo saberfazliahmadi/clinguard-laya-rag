@@ -59,6 +59,8 @@ def synthesize_extractive_claim(accepted_chunks: list[RetrievedChunk]) -> str:
 class ClinGuardPipeline:
     """5-stage clinical RAG pipeline with configurable ablation modes."""
 
+    retrieval_overlap_threshold: float = 0.0
+
     def __init__(
         self,
         retriever: HybridClinicalRetriever,
