@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import logging
-
-logger = logging.getLogger(__name__)
-
 from typing import Any
 
 from clinguard_rag.calibration import (
@@ -107,6 +104,8 @@ def evaluate_stage1_triage(
         routed_domains=routed_domains,
         skip_retrieval=skip,
     )
+
+logger = logging.getLogger(__name__)
 
 
 # Alias to support both function names across pipeline and tests

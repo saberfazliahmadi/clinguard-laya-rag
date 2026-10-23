@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import logging
-
-logger = logging.getLogger(__name__)
-
 import re
 from typing import Any
 
@@ -103,6 +100,8 @@ def verify_clinical_claim(
         verdict=verdict,
         guidelines_conflict_prob=round(conflict_prob, 4),
     )
+
+logger = logging.getLogger(__name__)
 
 
 # Alias for evaluation script compatibility

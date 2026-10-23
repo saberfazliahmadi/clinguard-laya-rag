@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 
-logger = logging.getLogger(__name__)
-
 from clinguard_rag.schemas import ClaimVerification, ClinicalDisposition, TriageDecision
 
 
@@ -85,3 +83,5 @@ def apply_clinical_policy(
         "RULE_6_VERIFIED_CITED_CLINICAL_ANSWER",
         verification.claim_text,
     )
+
+logger = logging.getLogger(__name__)
