@@ -88,7 +88,6 @@ def run_benchmark() -> dict[str, Any]:
 
     for mode in modes:
         pipeline = ClinGuardPipeline(retriever=retriever, mode=mode)
-        pipeline.fit_calibration(cal_cases)
         fitted_t = pipeline.fit_calibration(cal_cases) if mode == "clinguard_full" else 1.0
 
         disp_correct = 0
