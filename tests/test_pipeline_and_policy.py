@@ -106,8 +106,7 @@ def test_ablation_progression_and_calibration_improvement() -> None:
     cases = json.loads((DATA_DIR / "evaluation_benchmark.json").read_text(encoding="utf-8"))
     rb_pipe = ClinGuardPipeline(retriever=retriever, mode="retrieval_baseline")
     assert rb_pipe.retrieval_overlap_threshold == 0.0
-    fitted_overlap = rb_pipe.fit_calibration([c for c in cases if c["split"] == "calibration"])
-    assert fitted_overlap == 0.25
+    rb_pipe.fit_calibration([c for c in cases if c["split"] == "calibration"])
     assert rb_pipe.retrieval_overlap_threshold == 0.25
     assert summary["raw_system1"]["disposition_accuracy"] == 0.6
     assert summary["debiased_system1"]["disposition_accuracy"] == 0.8

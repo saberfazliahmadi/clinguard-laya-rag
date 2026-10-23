@@ -104,7 +104,7 @@ class ClinGuardPipeline:
                 best_acc,
             )
             self.calibrator.temperature = 1.0
-            return best_t
+            return 1.0
 
         if self.mode != "clinguard_full":
             self.calibrator.temperature = 1.0
