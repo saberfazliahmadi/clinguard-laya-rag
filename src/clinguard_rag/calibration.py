@@ -1,12 +1,13 @@
 """Post-hoc Temperature Scaling and calibration metrics (ECE, Top-Label Brier Score, NLL)."""
 
 from __future__ import annotations
+
 import math
-from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 
 
-def multiclass_nll(dists: List[Dict[str, float]], labels: List[str], temperature: float = 1.0) -> float:
+def multiclass_nll(dists: list[dict[str, float]], labels: list[str], temperature: float = 1.0) -> float:
     total_loss = 0.0
     eps = 1e-15
     for dist, label in zip(dists, labels):
@@ -17,8 +18,8 @@ def multiclass_nll(dists: List[Dict[str, float]], labels: List[str], temperature
 
 
 def apply_temperature_to_distribution(
-    probs: Dict[str, float], temperature: float
-) -> Dict[str, float]:
+    probs: dict[str, float], temperature: float
+) -> dict[str, float]:
     """Applies temperature scaling T > 0 to a categorical probability dictionary."""
     if temperature <= 0:
         raise ValueError("Temperature must be strictly positive.")
@@ -39,8 +40,8 @@ def apply_temperature_to_binary(prob: float, temperature: float) -> float:
 
 
 def compute_ece_and_brier(
-    confidences: List[float], correctness: List[int], num_bins: int = 10
-) -> Tuple[float, float]:
+    confidences: list[float], correctness: list[int], num_bins: int = 10
+) -> tuple[float, float]:
     """
     Computes Expected Calibration Error (ECE) across equal-width bins and
     Top-Label Confidence Brier Score: mean((top_confidence - is_correct)^2).
@@ -75,12 +76,12 @@ class TemperatureCalibrator:
     def __init__(
         self,
         initial_temperature: float = 1.0,
-        temperature: Optional[float] = None,
+        temperature: float | None = None,
     ) -> None:
         target_temp = temperature if temperature is not None else initial_temperature
         self.temperature: float = target_temp
 
-    def fit(self, distributions: List[Dict[str, float]], true_labels: List[str]) -> float:
+    def fit(self, distributions: list[dict[str, float]], true_labels: list[str]) -> float:
         best_t = 1.0
         best_nll = float("inf")
         eps = 1e-8

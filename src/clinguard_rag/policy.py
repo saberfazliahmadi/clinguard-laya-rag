@@ -1,18 +1,18 @@
 """Stage 5: Deterministic Clinical Policy Engine separating System-1 judgment from execution authority."""
 
 from __future__ import annotations
-from typing import List, Optional, Tuple
+
 from clinguard_rag.schemas import ClaimVerification, ClinicalDisposition, TriageDecision
 
 
 def apply_clinical_policy(
     triage: TriageDecision,
-    accepted_doc_ids: List[str],
-    verification: Optional[ClaimVerification],
+    accepted_doc_ids: list[str],
+    verification: ClaimVerification | None,
     support_threshold: float = 0.75,
     conflict_threshold: float = 0.40,  # Optimized to 0.40 to robustly handle T=1.4 probability cooling on EVAL-03
     enable_conflict_warning: bool = True,
-) -> Tuple[ClinicalDisposition, str, str]:
+) -> tuple[ClinicalDisposition, str, str]:
     """Maps calibrated System-1 outputs to a deterministic clinical disposition and response string."""
     out_of_scope_prob = triage.domain_choice.probabilities.get("out_of_scope", 0.0)
 

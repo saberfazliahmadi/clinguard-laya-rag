@@ -1,9 +1,11 @@
 """Integration and unit tests for ClinGuardPipeline, LayaLocalBackend, SystemOneHTTPBackend, and Policy Engine."""
 
 from __future__ import annotations
+
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
+
 from clinguard_rag.decision_engine import (
     DecisionBackend,
     LayaLocalBackend,
@@ -32,10 +34,10 @@ class MockLiveLayaBackend(DecisionBackend):
     def predict_raw(
         self,
         state: str,
-        questions: Union[Dict[str, Dict[str, Any]], List[Dict[str, Any]]],
-    ) -> Dict[str, Any]:
+        questions: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    ) -> dict[str, Any]:
         norm_q = normalize_questions_dict(questions)
-        answers: Dict[str, Any] = {}
+        answers: dict[str, Any] = {}
         for qid, qspec in norm_q.items():
             qtype = qspec["type"]
             assert "instructions" in qspec, f"Missing instructions in {qid}"
@@ -100,6 +102,11 @@ def test_ablation_progression_and_calibration_improvement() -> None:
     assert summary["retrieval_baseline"]["disposition_accuracy"] == 0.5
     assert summary["retrieval_baseline"]["unsafe_claim_leakage_rate"] < summary["baseline"]["unsafe_claim_leakage_rate"]
     assert summary["retrieval_baseline"]["brier_score"] is None
+    retriever = HybridClinicalRetriever.from_json(DATA_DIR / "clinical_guidelines_corpus.json")
+    cases = json.loads((DATA_DIR / "evaluation_benchmark.json").read_text(encoding="utf-8"))
+    rb_pipe = ClinGuardPipeline(retriever=retriever, mode="retrieval_baseline")
+    rb_pipe.fit_calibration([c for c in cases if c["split"] == "calibration"])
+    assert 0.20 <= rb_pipe.retrieval_overlap_threshold <= 0.50
     assert summary["raw_system1"]["disposition_accuracy"] == 0.6
     assert summary["debiased_system1"]["disposition_accuracy"] == 0.8
     assert summary["clinguard_full"]["disposition_accuracy"] == 1.0
@@ -127,7 +134,7 @@ def test_live_backend_predict_case_and_direct_policy_rules(monkeypatch: Any) -> 
     local_backend = LayaLocalBackend(checkpoint_id="convaiinnovations/laya-typed-decisions")
 
     class _StubAgent:
-        def predict(self, state: str, questions: Dict[str, Any]) -> Dict[str, Any]:
+        def predict(self, state: str, questions: dict[str, Any]) -> dict[str, Any]:
             assert "[REDACTED_EMAIL]" in state
             assert "criteria" in questions["q_choice"]
             return {"answers": {"q_choice": {"type": "choice", "probabilities": {"a": 0.9, "b": 0.1}}}}
@@ -146,26 +153,26 @@ def test_live_backend_predict_case_and_direct_policy_rules(monkeypatch: Any) -> 
 
     # Direct unit test of SystemOneHTTPBackend with monkeypatched httpx.Client
     http_backend = SystemOneHTTPBackend(base_url="http://localhost:8000", api_key="test-key")
-    captured_payload: Dict[str, Any] = {}
+    captured_payload: dict[str, Any] = {}
 
     class _DummyResp:
         def raise_for_status(self) -> None:
             pass
 
-        def json(self) -> Dict[str, Any]:
+        def json(self) -> dict[str, Any]:
             return {"answers": {"q_noul": {"type": "noul", "noul": 0.93}}}
 
     class _DummyClient:
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
-        def __enter__(self) -> "_DummyClient":
+        def __enter__(self) -> _DummyClient:
             return self
 
         def __exit__(self, *args: Any) -> None:
             pass
 
-        def post(self, url: str, json: Dict[str, Any], headers: Dict[str, str]) -> _DummyResp:
+        def post(self, url: str, json: dict[str, Any], headers: dict[str, str]) -> _DummyResp:
             captured_payload["url"] = url
             captured_payload["json"] = json
             captured_payload["headers"] = headers

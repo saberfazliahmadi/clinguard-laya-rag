@@ -95,6 +95,7 @@ class ClinGuardPipeline:
             ]
             candidate_claim = case_record.get("candidate_claim") or synthesize_extractive_claim(prelim_chunks)
             if not accepted_ids:
+            logger.info("Case %s abstained at Stage 3 evidence gate (0 chunks accepted)", case_id)
                 return AuditRecord(
                     case_id=case_id,
                     query=query,
@@ -153,6 +154,7 @@ class ClinGuardPipeline:
         triage = run_stage1_triage(raw_probs, temperature=temp, use_bidirectional=use_bi)
 
         if triage.skip_retrieval:
+            logger.info("Case %s halted at Stage 1 triage (skip_retrieval=True)", case_id)
             disp, rule, msg = apply_clinical_policy(
                 triage=triage,
                 accepted_doc_ids=[],

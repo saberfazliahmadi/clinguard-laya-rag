@@ -1,10 +1,12 @@
 """Reproducible benchmark evaluation comparing Baseline RAG and ClinGuard-RAG variants."""
 
 from __future__ import annotations
+
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+
 from clinguard_rag.calibration import (
     apply_temperature_to_distribution,
     compute_ece_and_brier,
@@ -26,13 +28,13 @@ UNSAFE_CATEGORIES = {
 
 
 def evaluate_claim_judge_calibration(
-    test_cases: List[Dict[str, Any]],
+    test_cases: list[dict[str, Any]],
     temperature: float,
     use_bidirectional_debiasing: bool,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Computes 10-bin ECE, Brier Score, and Multi-Class NLL on the held-out test split."""
-    confidences: List[float] = []
-    correctness: List[int] = []
+    confidences: list[float] = []
+    correctness: list[int] = []
     nll_sum = 0.0
     eps = 1e-8
 
@@ -71,7 +73,7 @@ def evaluate_claim_judge_calibration(
     }
 
 
-def run_benchmark() -> Dict[str, Any]:
+def run_benchmark() -> dict[str, Any]:
     retriever = HybridClinicalRetriever.from_json(
         ROOT / "data" / "clinical_guidelines_corpus.json"
     )
@@ -82,7 +84,7 @@ def run_benchmark() -> Dict[str, Any]:
     test_cases = [c for c in cases if c["split"] == "test"]
 
     modes = ["baseline", "retrieval_baseline", "raw_system1", "debiased_system1", "clinguard_full"]
-    summary: Dict[str, Any] = {}
+    summary: dict[str, Any] = {}
 
     for mode in modes:
         pipeline = ClinGuardPipeline(retriever=retriever, mode=mode)
@@ -91,7 +93,7 @@ def run_benchmark() -> Dict[str, Any]:
         disp_correct = 0
         unsafe_total = 0
         unsafe_leaked = 0
-        per_case: List[Dict[str, Any]] = []
+        per_case: list[dict[str, Any]] = []
 
         for case in test_cases:
             audit = pipeline.run_case(case)

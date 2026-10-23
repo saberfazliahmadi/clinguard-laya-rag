@@ -1,28 +1,30 @@
 """Stage 3 & Stage 4: Evidence chunk relevance filtering and 3-way claim verification."""
 
 from __future__ import annotations
+
 import re
-from typing import Any, Dict, List
+from typing import Any
+
 from clinguard_rag.calibration import apply_temperature_to_binary, apply_temperature_to_distribution
 from clinguard_rag.debiasing import combine_bidirectional_probabilities
 from clinguard_rag.schemas import ClaimVerification, DebiasedChoiceResult, RetrievedChunk
 
-CLAIM_OPTIONS: List[str] = ["supported", "contradicted", "not_mentioned"]
+CLAIM_OPTIONS: list[str] = ["supported", "contradicted", "not_mentioned"]
 CITATION_PATTERN = re.compile(r"\[([A-Z0-9\-]+)\]")
 
 
-def extract_citations(claim_text: str) -> List[str]:
+def extract_citations(claim_text: str) -> list[str]:
     return CITATION_PATTERN.findall(claim_text)
 
 
 def filter_retrieved_chunks(
-    retrieved: List[RetrievedChunk],
-    raw_chunk_relevance: Dict[str, float],
+    retrieved: list[RetrievedChunk],
+    raw_chunk_relevance: dict[str, float],
     temperature: float = 1.0,
     relevance_threshold: float = 0.60,
-) -> List[RetrievedChunk]:
+) -> list[RetrievedChunk]:
     """Evaluates retrieved passages with calibrated System-1 noul relevance scores (fail-closed on missing keys)."""
-    updated: List[RetrievedChunk] = []
+    updated: list[RetrievedChunk] = []
     for item in retrieved:
         if item.chunk.doc_id not in raw_chunk_relevance:
             cal_p = 0.0
@@ -44,7 +46,7 @@ def filter_retrieved_chunks(
 
 def verify_clinical_claim(
     claim_text: str,
-    raw_probs: Dict[str, Any],
+    raw_probs: dict[str, Any],
     temperature: float = 1.0,
     use_bidirectional: bool = True,
     three_way: bool = True,

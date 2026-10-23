@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 PHONE_REGEX = re.compile(
-    r"(?:\b(?:Tel|Phone|Call|Fax)[:\s\.]+\+?[0-9][0-9\s\-\(\)]{4,16}[0-9]\b"
+    r"(?:\b(?:Tel|Phone|Call|Fax|Contact|Mobile)[:\s\.]+\+?[0-9][0-9\s\-\(\)]{4,16}[0-9]\b"
     r"|\+\d{1,3}[\s\-]+\d{1,4}[\s\-]+\d{4,8}(?:[\s\-]+\d{2,6})?\b"
-    r"|\b0\d{2,4}[\s\-]+\d{3,4}(?:[\s\-]+\d{3,4})?\b"
+    r"|\b0\d{2,4}[\s\-]+\d{3,8}(?:[\s\-]+\d{2,6})?\b"
     r"|\(\d{2,4}\)[\s\-]*\d{3,4}[\s\-]+\d{3,4}\b"
     r"|\b\d{3,4}-\d{3,4}-\d{4}\b)",
     re.IGNORECASE,
@@ -41,8 +41,13 @@ ADDRESS_REGEX = re.compile(
     re.IGNORECASE,
 )
 PERSON_NAME_REGEX = re.compile(
-    r"\b(Pt\.?|Patient:?|Dr\.?|Doctor|Prof\.?|Mr\.?|Mrs\.?|Ms\.?)\s+"
+    r"\b(Pt\.?|Patient:?|Dr\.?|Doctor|Prof\.?|Mr\.?|Mrs\.?|Ms\.?|"
+    r"husband|wife|mother|father|son|daughter|brother|sister|partner|spouse)\s+"
     r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
+)
+CLINICAL_SUBJECT_NAME_REGEX = re.compile(
+    r"\b([A-Z][a-z]{2,15}\s+[A-Z][a-z]{2,15})\s+"
+    r"(?=presented|presents|admitted|complains|reported|reports|called|arrived|visited|underwent\b)"
 )
 
 
@@ -57,6 +62,7 @@ def redact_phi_hook(text: str) -> str:
     scrubbed = DOB_REGEX.sub("[REDACTED_DOB]", scrubbed)
     scrubbed = ADDRESS_REGEX.sub("[REDACTED_ADDRESS]", scrubbed)
     scrubbed = PERSON_NAME_REGEX.sub(r"\1 [REDACTED_NAME]", scrubbed)
+    scrubbed = CLINICAL_SUBJECT_NAME_REGEX.sub("[REDACTED_NAME] ", scrubbed)
     scrubbed = PHONE_REGEX.sub("[REDACTED_PHONE]", scrubbed)
     return scrubbed
 

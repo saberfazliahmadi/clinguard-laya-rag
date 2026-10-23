@@ -1,9 +1,11 @@
 """Interactive / single-command CLI demonstrating ClinGuard-RAG decision stages and audit records."""
 
 from __future__ import annotations
+
 import argparse
 import json
 from pathlib import Path
+
 from clinguard_rag.pipeline import ClinGuardPipeline
 from clinguard_rag.retriever import HybridClinicalRetriever
 

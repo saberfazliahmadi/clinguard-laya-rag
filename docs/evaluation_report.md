@@ -1,4 +1,6 @@
-# Phase 5: Evaluation & Ablation Report (`ClinGuard-RAG`)
+# Policy-Logic Test on Golden Fixtures: Evaluation & Calibration Report
+
+Phase 5: Evaluation & Ablation Report (`ClinGuard-RAG`)
 
 ## 1. Benchmark Methodology & Scope
 

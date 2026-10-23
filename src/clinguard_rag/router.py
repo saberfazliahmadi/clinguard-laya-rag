@@ -1,7 +1,9 @@
 """Stage 1 Pre-Retrieval Clinical Triage and Two-Step KB Fan-Out Router."""
 
 from __future__ import annotations
-from typing import Any, Dict, List, Optional
+
+from typing import Any
+
 from clinguard_rag.calibration import (
     apply_temperature_to_binary,
     apply_temperature_to_distribution,
@@ -9,7 +11,7 @@ from clinguard_rag.calibration import (
 from clinguard_rag.debiasing import combine_bidirectional_probabilities
 from clinguard_rag.schemas import DebiasedChoiceResult, TriageDecision
 
-CLINICAL_DOMAIN_OPTIONS: List[str] = [
+CLINICAL_DOMAIN_OPTIONS: list[str] = [
     "antimicrobial_stewardship",
     "cardiovascular_hypertension",
     "endocrine_diabetes",
@@ -19,10 +21,10 @@ CLINICAL_DOMAIN_OPTIONS: List[str] = [
 
 
 def evaluate_stage1_triage(
-    raw_probs: Dict[str, Any],
+    raw_probs: dict[str, Any],
     temperature: float = 1.0,
     use_bidirectional_debiasing: bool = True,
-    use_bidirectional: Optional[bool] = None,
+    use_bidirectional: bool | None = None,
     out_of_scope_threshold: float = 0.60,
     unsafe_threshold: float = 0.65,
     single_kb_threshold: float = 0.55,
@@ -83,7 +85,7 @@ def evaluate_stage1_triage(
     ranked_domains = sorted(norm_clin.items(), key=lambda kv: kv[1], reverse=True)
 
     if skip:
-        routed_domains: List[str] = []
+        routed_domains: list[str] = []
     elif ranked_domains and ranked_domains[0][1] >= single_kb_threshold:
         routed_domains = [ranked_domains[0][0]]
     elif len(ranked_domains) >= 2:

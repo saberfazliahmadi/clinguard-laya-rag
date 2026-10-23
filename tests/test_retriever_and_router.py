@@ -1,6 +1,7 @@
 """Unit tests for Stage 1 two-step router, Stage 2 hybrid RRF retriever, and fail-closed gates."""
 
 from pathlib import Path
+
 from clinguard_rag.retriever import HybridClinicalRetriever
 from clinguard_rag.router import run_stage1_triage
 from clinguard_rag.verifier import filter_retrieved_chunks

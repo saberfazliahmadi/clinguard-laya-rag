@@ -31,10 +31,11 @@ jobs:
           ruff check src tests scripts
           PYTHONPATH=src mypy src
 
-      - name: Run pytest suite
+      - name: Run pytest suite with coverage
         run: |
-          PYTHONPATH=src:. pytest -v
+          PYTHONPATH=src:. pytest -v --cov=clinguard_rag --cov-report=term-missing
 
-      - name: Run deterministic evaluation benchmark
+      - name: Run deterministic evaluation benchmark and CLI smoke check
         run: |
           PYTHONPATH=src:. python scripts/run_evaluation.py
+          PYTHONPATH=src:. python scripts/demo_cli.py --case-id EVAL-03 --mode clinguard_full

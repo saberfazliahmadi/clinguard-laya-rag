@@ -1,9 +1,12 @@
 """Unit tests for token budget math, bidirectional debiasing, temperature calibration, and PHI scrubbing."""
 
 from __future__ import annotations
+
 import json
 from pathlib import Path
+
 import pytest
+
 from clinguard_rag.calibration import (
     TemperatureCalibrator,
     apply_temperature_to_distribution,
@@ -73,13 +76,16 @@ def test_phi_redaction_and_question_dict_normalization() -> None:
         "call +49 40 123456; eGFR trend 120 130 1500; a@b.com; "
         "tel 040 1234 5678; (555) 123-4567; 555-123-4567; "
         "Patient: Maria Lopez; Dr. Jane Miller reviewed; "
-        "she lives at Hauptstrasse 5, 20095 Hamburg; Tel 040 1234"
+        "she lives at Hauptstrasse 5, 20095 Hamburg; Tel 040 1234; "
+        "Maria Lopez presented with chest pain; her husband Peter Braun called; contact 0176 12345678"
     )
     scrubbed = redact_phi_hook(sample)
     assert "Maria Lopez" not in scrubbed
     assert "Jane Miller" not in scrubbed
     assert "Hauptstrasse 5" not in scrubbed
     assert "040 1234" not in scrubbed
+    assert "Peter Braun" not in scrubbed
+    assert "0176 12345678" not in scrubbed
     assert "[REDACTED_NAME]" in scrubbed and "John Smith" not in scrubbed
     assert "[REDACTED_ADDRESS]" in scrubbed and "12 Elm St" not in scrubbed
     assert "[REDACTED_EMAIL]" in scrubbed and "a@b.com" not in scrubbed

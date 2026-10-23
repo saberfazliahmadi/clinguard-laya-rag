@@ -1,7 +1,7 @@
 """Bidirectional option-order debiasing and option-token budget validation for Laya."""
 
 from __future__ import annotations
-from typing import Dict, List
+
 from clinguard_rag.schemas import DebiasedChoiceResult
 
 
@@ -15,7 +15,7 @@ def compute_option_token_budget(num_options: int, head_max_len: int = 192) -> in
     return max(4, (head_max_len - 16) // num_options)
 
 
-def validate_choice_options(options: List[str], max_options: int = 20) -> int:
+def validate_choice_options(options: list[str], max_options: int = 20) -> int:
     """Enforces Laya's recommended option cardinality bound (<= 20 options)."""
     if len(options) < 2:
         raise ValueError("Choice questions require at least 2 options.")
@@ -28,9 +28,9 @@ def validate_choice_options(options: List[str], max_options: int = 20) -> int:
 
 
 def combine_bidirectional_probabilities(
-    options: List[str],
-    forward_probs: Dict[str, float],
-    reverse_probs: Dict[str, float],
+    options: list[str],
+    forward_probs: dict[str, float],
+    reverse_probs: dict[str, float],
     drift_threshold: float = 0.25,
 ) -> DebiasedChoiceResult:
     """
@@ -38,7 +38,7 @@ def combine_bidirectional_probabilities(
     and computes Total Variation Distance (TVD) as an epistemic instability signal.
     """
     budget = validate_choice_options(options)
-    combined: Dict[str, float] = {}
+    combined: dict[str, float] = {}
     tvd_sum = 0.0
 
     for opt in options:
