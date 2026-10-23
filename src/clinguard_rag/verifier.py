@@ -17,6 +17,7 @@ CITATION_PATTERN = re.compile(r"\[([A-Z0-9\-]+)\]")
 
 
 def extract_citations(claim_text: str) -> list[str]:
+    logger.debug("Completed verifier stage check")
     return CITATION_PATTERN.findall(claim_text)
 
 

@@ -80,7 +80,9 @@ def test_phi_redaction_and_question_dict_normalization() -> None:
         "Maria Lopez presented with chest pain; her husband Peter Braun called; contact 0176 12345678; "
         "Anna Schmidt was seen yesterday; John Doe is stable; "
         "Klaus Weber, 54, has diabetes; Anna Schmidt takes metformin daily; "
-        "Contact Anna Schmidt at home; Anna Schmidt, DOB 12.03.1970"
+        "Contact Anna Schmidt at home; Anna Schmidt, DOB 12.03.1970; "
+        "Anna Schmidt: metformin 500 mg; Her name is Anna Schmidt. "
+        "Heart Failure has severe symptoms; Acute Kidney had injury; Hamburg Hospital requires dose"
     )
     scrubbed = redact_phi_hook(sample)
     assert "Maria Lopez" not in scrubbed
@@ -93,6 +95,9 @@ def test_phi_redaction_and_question_dict_normalization() -> None:
     assert "John Doe" not in scrubbed
     assert "Klaus Weber" not in scrubbed
     assert "12.03.1970" not in scrubbed
+    assert "Heart Failure has severe" in scrubbed
+    assert "Acute Kidney had injury" in scrubbed
+    assert "Hamburg Hospital requires dose" in scrubbed
     assert "[REDACTED_NAME]" in scrubbed and "John Smith" not in scrubbed
     assert "[REDACTED_ADDRESS]" in scrubbed and "12 Elm St" not in scrubbed
     assert "[REDACTED_EMAIL]" in scrubbed and "a@b.com" not in scrubbed

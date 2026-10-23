@@ -42,12 +42,14 @@ ADDRESS_REGEX = re.compile(
 )
 PERSON_NAME_REGEX = re.compile(
     r"\b(Pt\.?|Patient:?|Dr\.?|Doctor|Prof\.?|Mr\.?|Mrs\.?|Ms\.?|"
-    r"husband|wife|mother|father|son|daughter|brother|sister|partner|spouse|Contact|contact)\s+"
+    r"husband|wife|mother|father|son|daughter|brother|sister|partner|spouse|"
+    r"Contact|contact|name\s+is|named)\s+"
     r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
 )
 CLINICAL_SUBJECT_NAME_REGEX = re.compile(
     r"\b([A-Z][a-z]{2,15}\s+[A-Z][a-z]{2,15})"
     r"(?=\s*,\s*(?:\d{1,3}(?:\s*(?:y/o|yo|years\s+old))?\s*,|DOB\b|\[REDACTED_DOB\])"
+    r"|\s*:\s*[A-Za-z]{3,20}\s+\d+\s*(?:mg|g|mcg|mL|units)\b"
     r"|\s+(?:presented|presents|admitted|complains|reported|reports|called|arrived|visited|underwent|"
     r"takes|took|started|stopped|requires|needs|denies|developed|received|"
     r"was\s+(?:seen|admitted|evaluated|treated|discharged|diagnosed|referred)|"
@@ -55,20 +57,62 @@ CLINICAL_SUBJECT_NAME_REGEX = re.compile(
     r"has\b|had\b))"
 )
 
+_NON_PERSON_CLINICAL_TERMS = {
+    "acute", "adult", "american", "angiotensin", "antimicrobial", "aortic", "arterial",
+    "atrial", "bacterial", "beta", "bilateral", "blood", "body", "bone", "brain",
+    "cardiac", "cardiovascular", "central", "cerebral", "chest", "chronic", "clinical",
+    "clinic", "college", "community", "acquired", "congestive", "coronary", "critical",
+    "department", "diabetes", "diabetic", "diastolic", "disease", "disorder", "distal",
+    "dose", "dosing", "drug", "dual", "early", "elderly", "emergency", "endocrine",
+    "european", "essential", "failure", "family", "fibrillation", "first", "fluid",
+    "function", "general", "glomerular", "global", "group", "guideline", "guidelines",
+    "hamburg", "heart", "hepatic", "high", "hospital", "human", "hypertension",
+    "hypertensive", "idiopathic", "immune", "impaired", "infection", "infectious",
+    "inflammatory", "initial", "injury", "inpatient", "institute", "insulin", "intensive",
+    "internal", "international", "intrathecal", "ischemic", "joint", "kidney", "laboratory",
+    "left", "legacy", "liver", "local", "lower", "lung", "major", "malignant", "maximum",
+    "medical", "medicine", "mellitus", "mental", "metabolic", "mild", "moderate",
+    "multidrug", "multiple", "myocardial", "national", "normal", "oral", "organ",
+    "outpatient", "patient", "pediatric", "peripheral", "pneumonia", "portal", "primary",
+    "progressive", "pulmonary", "rate", "reaction", "receptor", "recommended", "regional",
+    "renal", "respiratory", "resistant", "right", "routine", "safety", "second", "section",
+    "septic", "serum", "severe", "shock", "single", "sodium", "society", "stage", "standard",
+    "status", "stewardship", "stroke", "subacute", "syndrome", "system", "systemic",
+    "systolic", "table", "target", "therapy", "total", "treatment", "triage", "type",
+    "unit", "university", "upper", "urgent", "urinary", "vascular", "venous", "ventilator",
+    "ventricular", "viral", "ward", "world",
+}
+
+
+def _replace_titled_name(match: re.Match[str]) -> str:
+    prefix, candidate = match.group(1), match.group(2)
+    words = {w.lower() for w in candidate.split()}
+    if words & _NON_PERSON_CLINICAL_TERMS:
+        return match.group(0)
+    return f"{prefix} [REDACTED_NAME]"
+
+
+def _replace_subject_name(match: re.Match[str]) -> str:
+    candidate = match.group(1)
+    words = {w.lower() for w in candidate.split()}
+    if words & _NON_PERSON_CLINICAL_TERMS:
+        return candidate
+    return "[REDACTED_NAME]"
+
 
 def redact_phi_hook(text: str) -> str:
     """
-    Illustrative regex pre-scrubbing hook for emails, international/local/prefixed phone numbers,
-    MRNs, DOBs, US/European street addresses, and titled/prefixed person names (Pt, Patient, Dr., etc.).
-    Note: Regex scrubbing is a lightweight heuristic and not a certified HIPAA/GDPR NER de-identifier.
+    Lightweight regex pre-scrubbing hook for structured surface patterns (emails, phones,
+    MRNs, DOBs, common street addresses, and titled/clinical-context person names).
+    Note: Does not replace a certified clinical NER de-identification pipeline.
     """
     scrubbed = EMAIL_REGEX.sub("[REDACTED_EMAIL]", text)
     scrubbed = MRN_REGEX.sub("[REDACTED_MRN]", scrubbed)
     scrubbed = DOB_REGEX.sub("[REDACTED_DOB]", scrubbed)
-    scrubbed = ADDRESS_REGEX.sub("[REDACTED_ADDRESS]", scrubbed)
-    scrubbed = PERSON_NAME_REGEX.sub(r"\1 [REDACTED_NAME]", scrubbed)
-    scrubbed = CLINICAL_SUBJECT_NAME_REGEX.sub("[REDACTED_NAME]", scrubbed)
+    scrubbed = STREET_ADDRESS_REGEX.sub("[REDACTED_ADDRESS]", scrubbed)
     scrubbed = PHONE_REGEX.sub("[REDACTED_PHONE]", scrubbed)
+    scrubbed = PERSON_NAME_REGEX.sub(_replace_titled_name, scrubbed)
+    scrubbed = CLINICAL_SUBJECT_NAME_REGEX.sub(_replace_subject_name, scrubbed)
     return scrubbed
 
 

@@ -21,6 +21,7 @@ def apply_clinical_policy(
     out_of_scope_prob = triage.domain_choice.probabilities.get("out_of_scope", 0.0)
 
     # Rule 1a: Adversarial prompt attack / unsafe override gate (highest security priority)
+    logger.debug("Evaluating clinical policy rules (accepted_docs=%d)", len(accepted_doc_ids))
     if triage.prompt_attack_prob >= 0.65:
         return (
             ClinicalDisposition.ABSTAIN_UNSAFE_OR_OUT_OF_SCOPE,
