@@ -98,7 +98,7 @@ def evaluate_stage1_triage(
     else:
         routed_domains = []
 
-    logger.debug("Stage 1 triage completed: routed_domains=%s, skip_retrieval=%s", routed, skip_retrieval)
+    logger.debug("Stage 1 triage completed: routed_domains=%s, skip_retrieval=%s", routed_domains, skip)
     return TriageDecision(
         prompt_attack_prob=round(attack_prob, 4),
         urgency_expected_score=round(expected_urgency, 4),

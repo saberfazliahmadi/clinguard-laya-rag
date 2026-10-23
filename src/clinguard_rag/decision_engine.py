@@ -43,7 +43,7 @@ ADDRESS_REGEX = re.compile(
 PERSON_NAME_REGEX = re.compile(
     r"\b(Pt\.?|Patient:?|Dr\.?|Doctor|Prof\.?|Mr\.?|Mrs\.?|Ms\.?|"
     r"husband|wife|mother|father|son|daughter|brother|sister|partner|spouse|Contact|contact)\s+"
-    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}?)(?=\s+(?:at|in|on|by|from|for|with|was|is|has|had|takes|called|reviewed)\b|[,;\.]|$)"
+    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
 )
 CLINICAL_SUBJECT_NAME_REGEX = re.compile(
     r"\b([A-Z][a-z]{2,15}\s+[A-Z][a-z]{2,15})"
