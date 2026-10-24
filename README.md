@@ -1,3 +1,5 @@
+![ClinGuard RAG 5-stage decision layer](images/ClinGuard-RAG_5-Stage_Decision_Layer.png)
+
 # ClinGuard-RAG (`clinguard-laya-rag`)
 
 **A safety and fact-checking layer for medical AI search systems (RAG). It filters out wrong look-alike search results, warns doctors when medical guidelines disagree, and refuses to guess when evidence is missing.**
