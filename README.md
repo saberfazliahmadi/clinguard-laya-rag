@@ -331,7 +331,7 @@ All commands in Steps 6.1 to 6.4 run **$100\%$ offline** on your CPU in under 2 
 
 ### 6.1 Install in 3 Steps
 
-- **Python:** `3.10` or newer (tested on `3.10`, `3.11`, `3.12`, and `3.14`).
+- **Python:** `3.10` or newer (editable install verified on `3.10`--`3.14`; `requirements.lock` pins exact wheels for `3.10`--`3.13` in CI and Docker).
 - **OS:** Windows (PowerShell), Linux, or macOS.
 
 **1. Clone the repository:**
@@ -387,7 +387,8 @@ tests/test_debiasing_and_calibration.py ....                             [ 44%]
 tests/test_pipeline_and_policy.py ...                                    [ 77%]
 tests/test_retriever_and_router.py ..                                    [100%]
 
-============================== 9 passed in 1.26s ==============================
+Required test coverage of 85% reached. Total coverage: 92.05%
+============================== 9 passed in 1.65s ==============================
 All checks passed!                                                       [ruff]
 Success: no issues found in 10 source files                              [mypy]
 ```
@@ -633,7 +634,7 @@ For more details, see [`docs/evaluation_report.md`](docs/evaluation_report.md).
 
 ### Security and Privacy Protections
 1. **Local Screening & Fail-Closed External URL Guard:** When using `LayaLocalBackend` or a local `laya-serve` container (`localhost` / `127.0.0.1`), all checks stay on your machine. In addition, `SystemOneHTTPBackend` **blocks external URLs by default** (`allow_external_endpoint=False`): if you pass a non-local URL, it raises a `ValueError` unless you explicitly set `allow_external_endpoint=True`.
-2. **Demo Privacy Scrubber (`redact_phi_hook`):** `src/clinguard_rag/decision_engine.py` uses regex patterns to mask emails, phone numbers (`+49 40 123456`, `040 1234 5678`, `Tel 040 1234`), Medical Record Numbers (MRNs), Dates of Birth (DOBs), street addresses (`12 Elm St`, `Hauptstrasse 5, 20095 Hamburg`), and titled names (`Pt`, `Patient:`, `Dr.`, `Prof.`, `Mr.`, `Mrs.`, `Ms.`). **Important Limitation:** Regex rules only catch predictable text patterns (not untitled free-text names) and are **not** certified HIPAA or GDPR de-identification tools. Real hospital systems must use dedicated clinical NER de-identification software (such as Microsoft Presidio) and signed BAAs.
+2. **Demo Privacy Scrubber (`redact_phi_hook`):** `src/clinguard_rag/decision_engine.py` uses regex patterns to mask emails, international/local/mobile phone numbers (`+49 40 123456`, `040 1234 5678`, `0176 12345678`), Medical Record Numbers (MRNs), Dates of Birth (DOBs), street addresses (`12 Elm St`, `Hauptstrasse 5, 20095 Hamburg`), titled/prefixed names (`Pt`, `Patient:`, `Dr.`, `Prof.`, `Mr./Mrs./Ms.`, `Contact`, `name is`), and patient names before clinical verbs or age/medication appositives (`Klaus Weber, 54, has diabetes`, `Anna Schmidt: metformin 500 mg`). A position-aware clinical allowlist prevents capitalized medical or hospital terms (`Heart Failure`, `Acute Kidney`, `Hamburg Hospital`) from being mistakenly masked. **Important Limitation:** Regex rules and hand-written allowlists are only a lightweight demo heuristic (they still miss free-text names outside these patterns) and are **not** certified HIPAA or GDPR de-identification tools. Real hospital systems must use dedicated clinical NER de-identification software (such as Microsoft Presidio) and signed BAAs.
 3. **Fixed Rule Authority:** AI models in this project cannot run tools or write final user responses on their own. Plain Python rules in `src/clinguard_rag/policy.py` make every final decision.
 
 ### Known Technical Limitations
@@ -664,6 +665,8 @@ clinguard-laya-rag/
 │   ├── document_analysis.md               # Engineering review of Laya & Jev designs
 │   ├── evaluation_report.md               # Case-by-case 5-mode ablation & calibration report
 │   └── research_review.md                 # Literature review & arXiv paper disambiguation
+├── images/
+│   └── ClinGuard-RAG_5-Stage_Decision_Layer.png  # 5-stage architecture overview diagram
 ├── scripts/
 │   ├── __init__.py                        # Package marker for test imports
 │   ├── demo_cli.py                        # CLI to print the JSON AuditRecord for any case/mode
@@ -684,9 +687,10 @@ clinguard-laya-rag/
 │   ├── test_pipeline_and_policy.py        # End-to-end 5-mode integration & live-adapter unit tests
 │   └── test_retriever_and_router.py       # Unit tests for hybrid RRF retrieval & 2-step routing
 ├── .env.example                           # Example environment variables for optional live backends
-├── Dockerfile                             # Reproducible container image running the test suite
+├── Dockerfile                             # Reproducible container image installing from requirements.lock
 ├── LICENSE                                # Apache License 2.0 full text
-└── pyproject.toml                         # Dependencies, build config, pytest, ruff, mypy & coverage settings
+├── pyproject.toml                         # Dependencies, build config, pytest, ruff, mypy & coverage settings
+└── requirements.lock                      # Pinned dependency versions for reproducible CI & Docker builds
 ```
 </details>
 
