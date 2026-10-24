@@ -86,33 +86,31 @@ _NON_PERSON_CLINICAL_TERMS = {
 
 def _replace_titled_name(match: re.Match[str]) -> str:
     prefix, candidate = match.group(1), match.group(2)
-    words = {w.lower() for w in candidate.split()}
-    if words & _NON_PERSON_CLINICAL_TERMS:
+    if {w.lower() for w in candidate.split()} & _NON_PERSON_CLINICAL_TERMS:
         return match.group(0)
     return f"{prefix} [REDACTED_NAME]"
 
 
 def _replace_subject_name(match: re.Match[str]) -> str:
     candidate = match.group(1)
-    words = {w.lower() for w in candidate.split()}
-    if words & _NON_PERSON_CLINICAL_TERMS:
+    if {w.lower() for w in candidate.split()} & _NON_PERSON_CLINICAL_TERMS:
         return candidate
     return "[REDACTED_NAME]"
 
 
 def redact_phi_hook(text: str) -> str:
     """
-    Lightweight regex pre-scrubbing hook for structured surface patterns (emails, phones,
-    MRNs, DOBs, common street addresses, and titled/clinical-context person names).
-    Note: Does not replace a certified clinical NER de-identification pipeline.
+    Illustrative regex pre-scrubbing hook for emails, international/local/prefixed phone numbers,
+    MRNs, DOBs, US/European street addresses, and titled/prefixed person names (Pt, Patient, Dr., etc.).
+    Note: Regex scrubbing is a lightweight heuristic and not a certified HIPAA/GDPR NER de-identifier.
     """
     scrubbed = EMAIL_REGEX.sub("[REDACTED_EMAIL]", text)
     scrubbed = MRN_REGEX.sub("[REDACTED_MRN]", scrubbed)
     scrubbed = DOB_REGEX.sub("[REDACTED_DOB]", scrubbed)
-    scrubbed = STREET_ADDRESS_REGEX.sub("[REDACTED_ADDRESS]", scrubbed)
-    scrubbed = PHONE_REGEX.sub("[REDACTED_PHONE]", scrubbed)
+    scrubbed = ADDRESS_REGEX.sub("[REDACTED_ADDRESS]", scrubbed)
     scrubbed = PERSON_NAME_REGEX.sub(_replace_titled_name, scrubbed)
     scrubbed = CLINICAL_SUBJECT_NAME_REGEX.sub(_replace_subject_name, scrubbed)
+    scrubbed = PHONE_REGEX.sub("[REDACTED_PHONE]", scrubbed)
     return scrubbed
 
 
