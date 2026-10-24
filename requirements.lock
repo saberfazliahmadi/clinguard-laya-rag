@@ -1,10 +1,10 @@
-# Pinned reproducible lockfile for ClinGuard-RAG (exact versions tested in CI)
-numpy==2.5.4
-pydantic==2.14.1
+# Pinned reproducible lockfile for ClinGuard-RAG (compatible with Python 3.10, 3.11, 3.12, and 3.13)
+numpy==2.2.3
+pydantic==2.10.6
 httpx==0.28.1
 rank-bm25==0.2.2
-pytest==9.1.1
-pytest-cov==7.1.0
-coverage==7.17.0
-ruff==0.17.1
-mypy==2.4.0
+pytest==8.3.4
+pytest-cov==6.0.0
+coverage==7.6.12
+ruff==0.9.7
+mypy==1.15.0

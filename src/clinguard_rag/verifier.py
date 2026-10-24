@@ -17,7 +17,6 @@ CITATION_PATTERN = re.compile(r"\[([A-Z0-9\-]+)\]")
 
 
 def extract_citations(claim_text: str) -> list[str]:
-    logger.debug("Completed verifier stage check")
     return CITATION_PATTERN.findall(claim_text)
 
 
@@ -97,6 +96,7 @@ def verify_clinical_claim(
         raw_conflict = 0.05
 
     conflict_prob = apply_temperature_to_binary(float(raw_conflict), temperature)
+    logger.debug("Stage 4 claim verification verdict=%s (stable=%s, conflict=%.4f)", verdict.selected_option, verdict.is_positionally_stable, conflict_prob)
     return ClaimVerification(
         claim_text=claim_text,
         cited_doc_ids=extract_citations(claim_text),

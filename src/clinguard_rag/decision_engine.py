@@ -52,48 +52,70 @@ CLINICAL_SUBJECT_NAME_REGEX = re.compile(
     r"|\s*:\s*[A-Za-z]{3,20}\s+\d+\s*(?:mg|g|mcg|mL|units)\b"
     r"|\s+(?:presented|presents|admitted|complains|reported|reports|called|arrived|visited|underwent|"
     r"takes|took|started|stopped|requires|needs|denies|developed|received|"
-    r"was\s+(?:seen|admitted|evaluated|treated|discharged|diagnosed|referred)|"
-    r"is\s+(?:stable|unstable|a\s+\d+|currently|admitted)|"
-    r"has\b|had\b))"
+    r"lives|lived|works|worked|feels|felt|states|stated|suffers|suffered|"
+    r"was\b|is\b|has\b|had\b))"
 )
 
-_NON_PERSON_CLINICAL_TERMS = {
+_CLINICAL_FIRST_MODIFIERS = {
     "acute", "adult", "american", "angiotensin", "antimicrobial", "aortic", "arterial",
     "atrial", "bacterial", "beta", "bilateral", "blood", "body", "bone", "brain",
     "cardiac", "cardiovascular", "central", "cerebral", "chest", "chronic", "clinical",
-    "clinic", "college", "community", "acquired", "congestive", "coronary", "critical",
-    "department", "diabetes", "diabetic", "diastolic", "disease", "disorder", "distal",
-    "dose", "dosing", "drug", "dual", "early", "elderly", "emergency", "endocrine",
-    "european", "essential", "failure", "family", "fibrillation", "first", "fluid",
-    "function", "general", "glomerular", "global", "group", "guideline", "guidelines",
-    "hamburg", "heart", "hepatic", "high", "hospital", "human", "hypertension",
-    "hypertensive", "idiopathic", "immune", "impaired", "infection", "infectious",
-    "inflammatory", "initial", "injury", "inpatient", "institute", "insulin", "intensive",
-    "internal", "international", "intrathecal", "ischemic", "joint", "kidney", "laboratory",
-    "left", "legacy", "liver", "local", "lower", "lung", "major", "malignant", "maximum",
-    "medical", "medicine", "mellitus", "mental", "metabolic", "mild", "moderate",
-    "multidrug", "multiple", "myocardial", "national", "normal", "oral", "organ",
-    "outpatient", "patient", "pediatric", "peripheral", "pneumonia", "portal", "primary",
-    "progressive", "pulmonary", "rate", "reaction", "receptor", "recommended", "regional",
-    "renal", "respiratory", "resistant", "right", "routine", "safety", "second", "section",
-    "septic", "serum", "severe", "shock", "single", "sodium", "society", "stage", "standard",
-    "status", "stewardship", "stroke", "subacute", "syndrome", "system", "systemic",
-    "systolic", "table", "target", "therapy", "total", "treatment", "triage", "type",
-    "unit", "university", "upper", "urgent", "urinary", "vascular", "venous", "ventilator",
-    "ventricular", "viral", "ward", "world",
+    "community", "congestive", "coronary", "critical", "diabetic", "diastolic", "distal",
+    "dual", "early", "elderly", "emergency", "endocrine", "european", "essential",
+    "first", "fluid", "general", "glomerular", "global", "hamburg", "heart", "hepatic",
+    "high", "human", "hypertensive", "idiopathic", "immune", "impaired", "infectious",
+    "inflammatory", "initial", "inpatient", "insulin", "intensive", "internal",
+    "international", "intrathecal", "ischemic", "joint", "kidney", "laboratory", "left",
+    "legacy", "liver", "local", "lower", "lung", "major", "malignant", "maximum",
+    "medical", "mental", "metabolic", "mild", "moderate", "multidrug", "multiple",
+    "myocardial", "national", "normal", "oral", "organ", "outpatient", "patient",
+    "pediatric", "peripheral", "portal", "primary", "progressive", "pulmonary",
+    "recommended", "regional", "renal", "respiratory", "resistant", "right", "routine",
+    "second", "septic", "serum", "severe", "single", "sodium", "standard", "subacute",
+    "systemic", "systolic", "total", "upper", "urgent", "urinary", "vascular", "venous",
+    "ventilator", "ventricular", "viral", "world",
 }
+
+_CLINICAL_SECOND_NOUNS = {
+    "acquired", "acidosis", "alkalosis", "anemia", "angina", "artery", "asthma",
+    "attack", "block", "cancer", "care", "center", "clinic", "college", "committee",
+    "conflict", "control", "council", "crisis", "damage", "department", "diabetes",
+    "Check", "disease", "disorder", "dose", "dosing", "drug", "edema", "embolism",
+    "emergency", "failure", "fever", "fibrillation", "function", "group", "guideline",
+    "guidelines", "hospital", "hypertension", "impairment", "index", "infarction",
+    "infection", "injury", "institute", "insufficiency", "ischemia", "kidney", "label",
+    "level", "liver", "medicine", "mellitus", "nephropathy", "neuropathy", "node",
+    "organ", "pain", "palsy", "patient", "patients", "pneumonia", "pressure", "protocol",
+    "rate", "reaction", "receptor", "regimen", "regurgitation", "resistance", "response",
+    "retinopathy", "risk", "rule", "safety", "scale", "score", "section", "sepsis",
+    "shock", "society", "stage", "status", "stenosis", "stewardship", "stroke", "study",
+    "syndrome", "system", "table", "target", "test", "therapy", "threshold", "thrombosis",
+    "tract", "treatment", "triage", "trial", "tumor", "type", "ulcer", "unit",
+    "university", "valve", "vein", "virus", "ward",
+}
+
+
+def _is_clinical_or_institutional_phrase(candidate: str) -> bool:
+    tokens = [w.lower() for w in candidate.split()]
+    if not tokens:
+        return False
+    if tokens[0] in _CLINICAL_FIRST_MODIFIERS:
+        return True
+    if any(t in _CLINICAL_SECOND_NOUNS for t in tokens[1:]):
+        return True
+    return False
 
 
 def _replace_titled_name(match: re.Match[str]) -> str:
     prefix, candidate = match.group(1), match.group(2)
-    if {w.lower() for w in candidate.split()} & _NON_PERSON_CLINICAL_TERMS:
+    if _is_clinical_or_institutional_phrase(candidate):
         return match.group(0)
     return f"{prefix} [REDACTED_NAME]"
 
 
 def _replace_subject_name(match: re.Match[str]) -> str:
     candidate = match.group(1)
-    if {w.lower() for w in candidate.split()} & _NON_PERSON_CLINICAL_TERMS:
+    if _is_clinical_or_institutional_phrase(candidate):
         return candidate
     return "[REDACTED_NAME]"
 
