@@ -6,11 +6,12 @@ Phase 5: Evaluation & Ablation Report (`ClinGuard-RAG`)
 
 The evaluation benchmark (`data/evaluation_benchmark.json`) comprises **16 clinical scenarios** grounded in 10 excerpts from public clinical guidelines (`data/clinical_guidelines_corpus.json`):
 - **Calibration Split (`N = 6`, `CAL-01..CAL-06`):** Used strictly to fit the post-hoc scalar temperature parameter $T$ via grid search minimizing multi-class Negative Log-Likelihood (NLL).
-- **Held-Out Test Split (`N = 10`, `EVAL-01..EVAL-10`):** Evaluates four pipeline configurations using deterministic probability fixtures (`DeterministicEvalBackend`):
+- **Held-Out Test Split (`N = 10`, `EVAL-01..EVAL-10`):** Evaluates five pipeline configurations using deterministic probability fixtures (`DeterministicEvalBackend`):
   1. `baseline`: Hybrid retrieval + unverified candidate claim passthrough (no System-1 guard).
-  2. `raw_system1`: Uncalibrated ($T = 1.0$), single-order (forward-only), binary 2-way claim verification (`supported` vs. `unsupported`), without explicit conflict preservation.
-  3. `debiased_system1`: Adds bidirectional option-order averaging ($\Delta_{\text{order}}$ TVD instability gating at $> 0.25$), 3-way claim verification (`supported`, `contradicted`, `not_mentioned`), and Stage 3 chunk relevance gating ($\ge 0.60$) at $T = 1.0$.
-  4. `clinguard_full`: Adds post-hoc temperature scaling ($T = 1.4$) and Rule 5 inter-guideline conflict preservation (`SERVE_WITH_CONFLICT_WARNING`).
+  2. `retrieval_baseline`: Lexical-overlap gate only (threshold selected on the calibration split), no System-1 judge.
+  3. `raw_system1`: Uncalibrated ($T = 1.0$), single-order (forward-only), binary 2-way claim verification (`supported` vs. `unsupported`), without explicit conflict preservation.
+  4. `debiased_system1`: Adds bidirectional option-order averaging ($\Delta_{\text{order}}$ TVD instability gating at $> 0.25$), 3-way claim verification (`supported`, `contradicted`, `not_mentioned`), and Stage 3 chunk relevance gating ($\ge 0.60$) at $T = 1.0$.
+  5. `clinguard_full`: Adds post-hoc temperature scaling ($T = 1.4$, applied to the claim-verification head only) and Rule 5 inter-guideline conflict preservation (`SERVE_WITH_CONFLICT_WARNING`).
 
 ## 2. Quantitative Ablation Results (Held-Out Test Split, `N = 10`)
 
@@ -20,6 +21,7 @@ Reproduced via `python scripts/run_evaluation.py`:
 | Pipeline Mode | Temp ($T$) | Disposition Accuracy (`N=10`) | Unsafe Claim Leakage (`N=5` unsafe) | Claim Judge Accuracy | Top-Label Brier Score ($\downarrow$) | Multi-Class NLL ($\downarrow$) | 10-Bin ECE ($\downarrow$) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **`baseline`** | `1.0` | `40.0%` (`4/10`) | `100.0%` (`5/5`) | -- | -- | -- | -- |
+| **`retrieval_baseline`** | `1.0` | `50.0%` (`5/10`) | `60.0%` (`3/5`) | -- | -- | -- | -- |
 | **`raw_system1`** | `1.0` | `60.0%` (`6/10`) | `60.0%` (`3/5`) | `70.0%` (`7/10`) | `0.2158` | `0.7688` | `0.2400` |
 | **`debiased_system1`** | `1.0` | `80.0%` (`8/10`) | `20.0%` (`1/5`) | `80.0%` (`8/10`) | `0.1773` | `0.6458` | `0.2315` |
 | **`clinguard_full`** | **`1.4`** | **`100.0%` (`10/10`)** | **`0.0%` (`0/5`)** | **`80.0%` (`8/10`)** | **`0.1668`** | **`0.6251`** | `0.2574` |

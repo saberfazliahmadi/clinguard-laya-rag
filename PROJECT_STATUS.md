@@ -25,13 +25,13 @@
 | :--- | :--- | :--- |
 | `schemas.py` | Pydantic v2 schemas for `ClinicalChunk`, `RetrievedChunk`, `DebiasedChoiceResult`, `TriageDecision`, `ClaimVerification`, `ClinicalDisposition`, and `AuditRecord`. | Verified |
 | `debiasing.py` | Enforces the $\le 20$ option cardinality limit ($\max(4, \lfloor(192-16)/K\rfloor)$ tokens/option) and computes bidirectional forward/reverse averages with Total Variation Distance ($\Delta_{\text{order}}$) stability gating. | Verified |
-| `calibration.py` | Fits scalar temperature $T > 0$ via multi-class Negative Log-Likelihood (NLL) grid search (`0.50` to `3.00`, step `0.05`) and computes 10-bin Expected Calibration Error (ECE) and Brier Score. | Verified |
+| `calibration.py` | Fits scalar temperature $T > 0$ via multi-class Negative Log-Likelihood (NLL) grid search (141 values from `0.50` to `4.00`, step `0.025`) for the claim-verification head only and computes 10-bin Expected Calibration Error (ECE) and Brier Score. | Verified |
 | `router.py` | Stage 1 pre-retrieval triage (`prompt_attack_or_unsafe`, `clinical_urgency` expected value $E[\text{urgency}]$, and two-step 1-domain vs. 2-domain knowledge-base fan-out). | Verified |
 | `retriever.py` | Stage 2 hybrid lexical (`BM25Okapi`) + L2-normalized IDF cosine similarity retriever combined via Reciprocal Rank Fusion ($k_{\text{RRF}} = 60$), with fail-closed handling for empty domain lists and zero-overlap queries. | Verified |
 | `verifier.py` | Stage 3 chunk relevance gate (fail-closed on missing document scores) and Stage 4 bidirectional 3-way claim verification (`supported`, `contradicted`, `not_mentioned`) with `[DOC-ID]` citation provenance checking. | Verified |
 | `policy.py` | Stage 5 deterministic 6-rule clinical policy guard mapping calibrated outputs to `ClinicalDisposition` while prioritizing acute emergency escalation (`RULE_2`) ahead of out-of-scope abstention. | Verified |
 | `decision_engine.py` | Provides `DeterministicEvalBackend` for offline reproducible CI benchmarks, alongside `LayaLocalBackend` and `SystemOneHTTPBackend` supporting `{question_id: definition}` dictionary normalization, live `predict_case` mapping, and pre-inference regex PHI scrubbing. | Verified |
-| `pipeline.py` | End-to-end `ClinGuardPipeline` orchestrator supporting 4 ablation modes (`baseline`, `raw_system1`, `debiased_system1`, `clinguard_full`) and extractive claim fallback. | Verified |
+| `pipeline.py` | End-to-end `ClinGuardPipeline` orchestrator supporting 5 ablation modes (`baseline`, `retrieval_baseline`, `raw_system1`, `debiased_system1`, `clinguard_full`, validated at construction), staged backend calls, per-routed-domain retrieval, fail-closed error handling, and extractive claim fallback. | Verified |
 
 ---
 
