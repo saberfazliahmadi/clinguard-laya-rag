@@ -52,7 +52,7 @@ Instead of trusting one text-writing AI to check its own work, `ClinGuard-RAG` a
 
 ## 1. Why Separate "Writing Text" from "Making Safety Decisions"?
 
-Most AI search systems--called **Retrieval-Augmented Generation (RAG)**--use one big **System-2** language model (like ChatGPT or Claude) to do everything. That one model searches, judges the search results, and writes the final paragraph token by token.
+Most AI search systems--called **Retrieval-Augmented Generation (RAG)**--use one big **System-2** large language model (LLM) to do everything. That one model searches, judges the search results, and writes the final paragraph token by token.
 
 `ClinGuard-RAG` splits the work between two different kinds of tools:
 
@@ -237,7 +237,7 @@ Here is a quick cheat sheet of the four main technical ideas in `ClinGuard-RAG`.
 
 ### 5.1 System-1 Typed Decision Models (`choice`, `score`, `noul`)
 
-- **Simple explanation:** A **System-2** model (like ChatGPT) writes text one word at a time. A **System-1** model (like **Laya**, 421M parameters built on `ModernBERT-large`, or **Jev**) takes a text passage (`state`) and a structured question, and outputs a probability table in one fast step (~35 ms on a T4 GPU).
+- **Simple explanation:** A **System-2** model (a general-purpose chat LLM) writes text one word at a time. A **System-1** model (like **Laya**, 421M parameters built on `ModernBERT-large`, or **Jev**) takes a text passage (`state`) and a structured question, and outputs a probability table in one fast step (~35 ms on a T4 GPU).
 - **The three question types (`laya==0.4.12` format):**
   1. **`choice` (Multiple Choice):** Picks from a list of options (passed in `criteria`, e.g., `["supported", "contradicted", "not_mentioned"]`) and returns probabilities that add up to $1.0$.
   2. **`score` (Numeric Scale):** Rates urgency on a scale (passed in `criteria` for levels `0`, `1`, `2`, `3`) and returns the probability of each level plus the weighted average score.
@@ -804,7 +804,7 @@ clinguard-laya-rag/
 | **Negative Log-Likelihood (NLL)** | A math score that punishes confident wrong predictions. Used to find $T = 1.4$. |
 | **Positional Bias** | When an AI model changes its answer just because you changed the order of the multiple-choice options. |
 | **Reciprocal Rank Fusion (RRF)** | A fair way to combine two search lists (keyword + vector) by adding their rank fractions $\frac{1}{60 + \text{rank}}$. |
-| **System 1 vs. System 2** | **System 1** models make fast probability judgments in one step (Laya/Jev); **System 2** models write text word-by-word (ChatGPT/Claude). |
+| **System 1 vs. System 2** | **System 1** models make fast probability judgments in one step (Laya/Jev); **System 2** models write text word-by-word (general-purpose chat LLMs). |
 | **Temperature Scaling ($T$)** | Dividing log-scores by $T > 1$ to cool down overconfident predictions. |
 | **Top-Label Brier Score** | The average squared gap between the model's top confidence score and whether it was right ($1$) or wrong ($0$). Lower is better. |
 | **Total Variation Distance ($\Delta_{\text{order}}$)** | A number from $0.0$ to $1.0$ showing how much the model's probabilities changed when options were reversed. |
