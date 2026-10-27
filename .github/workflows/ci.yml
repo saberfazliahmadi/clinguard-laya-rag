@@ -6,12 +6,16 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +24,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.lock
 
       - name: Install dependencies
         run: |
@@ -30,7 +36,7 @@ jobs:
       - name: Run Ruff linter and Mypy type checker
         run: |
           ruff check src tests scripts
-          PYTHONPATH=src mypy src
+          PYTHONPATH=src:. mypy src scripts
 
       - name: Run pytest suite with coverage
         run: |
@@ -40,3 +46,24 @@ jobs:
         run: |
           PYTHONPATH=src:. python scripts/run_evaluation.py
           PYTHONPATH=src:. python scripts/demo_cli.py --case-id EVAL-03 --mode clinguard_full
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Audit pinned dependencies for known vulnerabilities
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit -r requirements.lock
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run the test image
+        run: |
+          docker build -t clinguard-rag:ci .
+          docker run --rm clinguard-rag:ci

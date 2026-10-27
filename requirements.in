@@ -1,0 +1,17 @@
+# Direct dependencies for CI and Docker. Regenerate the hashed lockfile with (run on Python 3.10, the
+# oldest supported version, so Python<3.11 backports are included):
+#   pip-compile --generate-hashes --allow-unsafe --no-strip-extras --output-file=requirements.lock requirements.in
+numpy==2.2.3
+pydantic==2.10.6
+httpx==0.28.1
+rank-bm25==0.2.2
+pytest==9.0.3
+pytest-cov==6.0.0
+coverage==7.6.12
+ruff==0.9.7
+mypy==1.15.0
+
+# Transitive pins: hold back releases younger than two weeks (supply-chain soak period), unless a
+# security fix requires a newer one; then pin the oldest patched release.
+certifi==2026.10.19  # oldest release fixing PYSEC-2026-4320
+pluggy==1.6.0

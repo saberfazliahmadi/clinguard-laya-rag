@@ -1,15 +1,25 @@
+# Test/evaluation image: runs the deterministic suite by default. Not a serving image.
 FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app/src:/app
 
 WORKDIR /app
 
-COPY pyproject.toml requirements.lock README.md LICENSE ./
+COPY requirements.lock ./
+RUN python -m pip install --upgrade pip && pip install -r requirements.lock
+
+COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
 COPY data/ ./data/
 COPY scripts/ ./scripts/
 COPY tests/ ./tests/
+RUN pip install --no-deps . \
+    && useradd --create-home --uid 10001 app \
+    && chown -R app:app /app
 
-RUN python -m pip install --no-cache-dir --upgrade pip &&     pip install --no-cache-dir -r requirements.lock &&     pip install --no-cache-dir --no-deps -e .
-
-ENV PYTHONPATH=/app/src:/app
+USER app
 
 CMD ["pytest", "-v", "--cov=clinguard_rag", "--cov-fail-under=85"]
