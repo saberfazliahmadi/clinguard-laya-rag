@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
+
+from clinguard_rag import __version__
 
 
 class DecisionPrimitive(str, Enum):
@@ -28,7 +32,7 @@ class GuidelineChunk(BaseModel):
     doc_id: str
     title: str
     source_org: str = ""
-    publication_year: int = 2025
+    publication_year: int | None = None
     domain: str
     text: str
     clinical_keywords: list[str] = Field(default_factory=list)
@@ -45,8 +49,8 @@ class RetrievedChunk(BaseModel):
     rrf_score: float = 0.0
     bm25_rank: int = 0
     dense_rank: int = 0
-    relevance_prob: float = 0.0
-    system1_relevance_prob: float = 0.0
+    relevance_prob: float = Field(default=0.0, ge=0.0, le=1.0)
+    system1_relevance_prob: float = Field(default=0.0, ge=0.0, le=1.0)
     passed_gate: bool = False
 
 
@@ -55,7 +59,7 @@ class DebiasedChoiceResult(BaseModel):
     probabilities: dict[str, float]
     forward_probabilities: dict[str, float] = Field(default_factory=dict)
     reverse_probabilities: dict[str, float] = Field(default_factory=dict)
-    order_tvd_drift: float = 0.0
+    order_tvd_drift: float = Field(default=0.0, ge=0.0, le=1.0)
     is_positionally_stable: bool = True
     tokens_per_option_budget: int = 35
 
@@ -65,8 +69,8 @@ DomainChoiceDecision = DebiasedChoiceResult
 
 
 class TriageDecision(BaseModel):
-    prompt_attack_prob: float = 0.0
-    urgency_expected_score: float = 0.0
+    prompt_attack_prob: float = Field(default=0.0, ge=0.0, le=1.0)
+    urgency_expected_score: float = Field(default=0.0, ge=0.0, le=3.0)
     urgency_probabilities: list[float] = Field(default_factory=lambda: [0.7, 0.2, 0.08, 0.02])
     domain_choice: DebiasedChoiceResult
     routed_domains: list[str] = Field(default_factory=list)
@@ -77,7 +81,7 @@ class ClaimVerificationResult(BaseModel):
     claim_text: str
     cited_doc_ids: list[str] = Field(default_factory=list)
     verdict: DebiasedChoiceResult
-    guidelines_conflict_prob: float = 0.0
+    guidelines_conflict_prob: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 # Alias ClaimVerification to ClaimVerificationResult
@@ -91,7 +95,11 @@ class AuditRecord(BaseModel):
     engine_backend: str
     checkpoint_id: str
     temperature_parameter: float
-    triage: TriageDecision
+    head_temperatures: dict[str, float] = Field(default_factory=dict)
+    policy_config: dict[str, Any] = Field(default_factory=dict)
+    pipeline_version: str = __version__
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    triage: TriageDecision | None = None
     retrieved_doc_ids: list[str] = Field(default_factory=list)
     accepted_doc_ids: list[str] = Field(default_factory=list)
     claim_verification: ClaimVerificationResult | None = None

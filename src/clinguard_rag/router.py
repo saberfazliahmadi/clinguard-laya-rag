@@ -35,8 +35,9 @@ def evaluate_stage1_triage(
     """
     Executes Stage 1 Triage (`noul` safety check, `score` urgency, `choice` domain routing)
     and applies the two-step KB fan-out rule:
-      1. Skip retrieval only if P(out_of_scope) >= 0.60 or P(prompt_attack) >= 0.65.
-      2. Renormalize over the 4 clinical domains; route to 1 domain if top >= 0.55, else top-2 fan-out.
+      1. Skip retrieval only if P(out_of_scope) >= out_of_scope_threshold or P(prompt_attack) >= unsafe_threshold.
+      2. Renormalize over the 4 clinical domains; route to 1 domain if top >= single_kb_threshold, else top-2 fan-out.
+    Defaults mirror `PolicyConfig`; the pipeline passes its config explicitly so both stages stay consistent.
     """
     if use_bidirectional is not None:
         use_bidirectional_debiasing = use_bidirectional
@@ -63,13 +64,16 @@ def evaluate_stage1_triage(
             CLINICAL_DOMAIN_OPTIONS, fwd_dom, rev_dom
         )
     else:
-        dist = fwd_dom if fwd_dom else {d: 0.2 for d in CLINICAL_DOMAIN_OPTIONS}
+        # Fill every option so a partial or empty backend distribution cannot raise KeyError downstream.
+        dist = {d: float(fwd_dom.get(d, 0.0)) for d in CLINICAL_DOMAIN_OPTIONS}
+        total = sum(dist.values())
+        dist = {d: p / total for d, p in dist.items()} if total > 0 else {d: 0.2 for d in CLINICAL_DOMAIN_OPTIONS}
         best_opt = max(dist.items(), key=lambda kv: kv[1])[0]
         domain_choice = DebiasedChoiceResult(
             selected_option=best_opt,
             probabilities=dist,
             forward_probabilities=dist,
-            reverse_probabilities=rev_dom if rev_dom else dist,
+            reverse_probabilities={d: float(rev_dom.get(d, 0.0)) for d in CLINICAL_DOMAIN_OPTIONS} if rev_dom else dist,
             order_tvd_drift=0.0,
             is_positionally_stable=True,
             tokens_per_option_budget=35,
@@ -79,7 +83,7 @@ def evaluate_stage1_triage(
     skip = (p_oos >= out_of_scope_threshold) or (attack_prob >= unsafe_threshold)
 
     clinical_only = {
-        d: domain_choice.probabilities[d]
+        d: domain_choice.probabilities.get(d, 0.0)
         for d in CLINICAL_DOMAIN_OPTIONS
         if d != "out_of_scope"
     }
@@ -107,5 +111,7 @@ def evaluate_stage1_triage(
         routed_domains=routed_domains,
         skip_retrieval=skip,
     )
+
+
 # Alias to support both function names across pipeline and tests
 run_stage1_triage = evaluate_stage1_triage

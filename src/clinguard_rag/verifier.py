@@ -13,7 +13,8 @@ from clinguard_rag.schemas import ClaimVerification, DebiasedChoiceResult, Retri
 logger = logging.getLogger(__name__)
 
 CLAIM_OPTIONS: list[str] = ["supported", "contradicted", "not_mentioned"]
-CITATION_PATTERN = re.compile(r"\[([A-Z0-9\-]+)\]")
+# Document IDs: alphanumeric start, then letters/digits/underscore/dot/hyphen (no spaces).
+CITATION_PATTERN = re.compile(r"\[([A-Za-z0-9][A-Za-z0-9_.\-]*)\]")
 
 
 def extract_citations(claim_text: str) -> list[str]:
@@ -54,10 +55,22 @@ def verify_clinical_claim(
     use_bidirectional: bool = True,
     three_way: bool = True,
     drift_threshold: float = 0.25,
+    conflict_temperature: float | None = None,
 ) -> ClaimVerification:
-    """Runs 3-way (or 2-way baseline) claim verification with bidirectional order debiasing."""
-    fwd = apply_temperature_to_distribution(raw_probs["claim_fwd"], temperature)
-    rev = apply_temperature_to_distribution(raw_probs["claim_rev"], temperature)
+    """
+    Runs 3-way (or 2-way baseline) claim verification with bidirectional order debiasing.
+    `temperature` scales the claim heads; `conflict_temperature` (defaults to `temperature`) scales the
+    conflict noul head, which is a different question and should only be cooled with its own fitted value.
+    Raises ValueError when a required System-1 signal is missing so callers can fail closed.
+    """
+    missing = [k for k in ("claim_fwd", "claim_rev", "guidelines_conflict_noul") if raw_probs.get(k) is None]
+    if missing:
+        raise ValueError(f"Missing required System-1 claim verification signals: {missing}")
+
+    fwd_raw = {o: float(raw_probs["claim_fwd"].get(o, 0.0)) for o in CLAIM_OPTIONS}
+    rev_raw = {o: float(raw_probs["claim_rev"].get(o, 0.0)) for o in CLAIM_OPTIONS}
+    fwd = apply_temperature_to_distribution(fwd_raw, temperature)
+    rev = apply_temperature_to_distribution(rev_raw, temperature)
 
     if not three_way:
         fwd_2 = {
@@ -86,16 +99,8 @@ def verify_clinical_claim(
             tokens_per_option_budget=58,
         )
 
-    raw_conflict = raw_probs.get("guidelines_conflict_noul")
-    if raw_conflict is None:
-        for k, v in raw_probs.items():
-            if "conflict" in k.lower() and isinstance(v, (int, float)):
-                raw_conflict = float(v)
-                break
-    if raw_conflict is None:
-        raw_conflict = 0.05
-
-    conflict_prob = apply_temperature_to_binary(float(raw_conflict), temperature)
+    conflict_t = temperature if conflict_temperature is None else conflict_temperature
+    conflict_prob = apply_temperature_to_binary(float(raw_probs["guidelines_conflict_noul"]), conflict_t)
     logger.debug("Stage 4 claim verification verdict=%s (stable=%s, conflict=%.4f)", verdict.selected_option, verdict.is_positionally_stable, conflict_prob)
     return ClaimVerification(
         claim_text=claim_text,
@@ -103,5 +108,7 @@ def verify_clinical_claim(
         verdict=verdict,
         guidelines_conflict_prob=round(conflict_prob, 4),
     )
+
+
 # Alias for evaluation script compatibility
 CLAIM_VERIFICATION_OPTIONS_3WAY = CLAIM_OPTIONS

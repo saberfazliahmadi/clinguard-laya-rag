@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import re
 from abc import ABC, abstractmethod
-from typing import Any, cast
+from typing import Any, TypeGuard, cast
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -174,55 +176,117 @@ def normalize_questions_dict(
     raise TypeError("questions must be a dict or a list of question dicts.")
 
 
+
+
+_TRIAGE_SIGNALS = ("prompt_attack_or_unsafe", "clinical_urgency_probs", "domain_fwd", "domain_rev")
+
+
+class MissingSignalError(ValueError):
+    """Raised when a System-1 response lacks a required safety or verification signal (fail-closed)."""
+
+
+class StateTooLongError(ValueError):
+    """Raised when a System-1 state would exceed the model context budget and risk silent truncation."""
+
+
+def _is_prob_mass(value: object) -> TypeGuard[float]:
+    """True for a finite, non-negative real number (bools, NaN, and infinities are rejected)."""
+    return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+
+def _answers(resp: dict[str, Any]) -> dict[str, Any]:
+    answers = resp.get("answers", resp)
+    return answers if isinstance(answers, dict) else {}
+
+
 def _extract_answer_distribution(
     resp: dict[str, Any], qid: str, options: list[str]
 ) -> dict[str, float]:
-    """Extracts a probability dictionary for a choice question from a Laya/SystemOne response."""
-    answers = resp.get("answers", resp)
-    entry = answers.get(qid, {})
+    """Extracts a normalized probability dictionary for a choice question (raises if absent or degenerate)."""
+    entry = _answers(resp).get(qid)
     if isinstance(entry, dict):
         probs = entry.get("probabilities") or entry.get("scores") or entry
         if isinstance(probs, dict):
-            total = sum(float(probs.get(o, 0.0)) for o in options)
-            if total > 0:
-                return {o: float(probs.get(o, 0.0)) / total for o in options}
-    return {o: 1.0 / len(options) for o in options}
+            values = {o: probs.get(o, 0.0) for o in options}
+            if all(_is_prob_mass(v) for v in values.values()):
+                total = sum(float(v) for v in values.values())
+                if total > 0:
+                    return {o: float(v) / total for o, v in values.items()}
+    raise MissingSignalError(f"System-1 response is missing a usable choice distribution for '{qid}'.")
 
 
-def _extract_noul_prob(resp: dict[str, Any], qid: str, default: float = 0.0) -> float:
+def _extract_noul_prob(resp: dict[str, Any], qid: str) -> float:
     """Extracts a binary noul probability from a Laya (`{'type': 'noul', 'noul': p}`) or SystemOne response."""
-    answers = resp.get("answers", resp)
-    entry = answers.get(qid, default)
-    if isinstance(entry, (int, float)):
-        return float(entry)
-    if isinstance(entry, dict):
+    entry = _answers(resp).get(qid)
+    value: float | None = None
+    if _is_prob_mass(entry):
+        value = float(entry)
+    elif isinstance(entry, dict):
         for k in ("noul", "probability", "prob", "score", "true", "yes"):
-            if k in entry and isinstance(entry[k], (int, float)):
-                return float(entry[k])
-    return default
+            if k in entry and _is_prob_mass(entry[k]):
+                value = float(entry[k])
+                break
+    if value is None or not 0.0 <= value <= 1.0:
+        raise MissingSignalError(f"System-1 response is missing a valid noul probability for '{qid}'.")
+    return value
 
 
 def _extract_score_probs(resp: dict[str, Any], qid: str) -> list[float]:
     """Extracts 4-level urgency probabilities [0, 1, 2, 3] from a Laya (dict) or SystemOne (list) response."""
-    answers = resp.get("answers", resp)
-    entry = answers.get(qid, {})
+    entry = _answers(resp).get(qid)
     if isinstance(entry, dict):
         probs = entry.get("probabilities") or entry.get("distribution")
+        raw: list[Any] | None = None
         if isinstance(probs, dict) and len(probs) == 4:
-            ordered = [float(probs.get(str(i)) or probs.get(i) or 0.0) for i in range(4)]
-            s = sum(ordered) or 1.0
+            raw = [probs.get(str(i), probs.get(i, 0.0)) for i in range(4)]
+        elif isinstance(probs, list) and len(probs) == 4:
+            raw = list(probs)
+        ordered = [float(x) for x in raw] if raw is not None and all(_is_prob_mass(x) for x in raw) else None
+        if ordered is not None and sum(ordered) > 0:
+            s = sum(ordered)
             return [x / s for x in ordered]
-        if isinstance(probs, list) and len(probs) == 4:
-            s = sum(float(x) for x in probs) or 1.0
-            return [float(x) / s for x in probs]
-    return [0.70, 0.20, 0.08, 0.02]
+    raise MissingSignalError(f"System-1 response is missing a 4-level score distribution for '{qid}'.")
+
+
+def _untrusted_inline(text: str) -> str:
+    """
+    Neutralizes user-controlled text before it is embedded in a System-1 state: collapses all whitespace
+    onto one line (so it cannot open fake `Evidence:` / `Candidate Claim:` sections) and replaces square
+    brackets (so it cannot forge `[DOC-ID]` evidence markers).
+    """
+    return " ".join(text.split()).replace("[", "(").replace("]", ")")
+
+
+def build_claim_state(query: str, claim_text: str, evidence_chunks: list[RetrievedChunk]) -> str:
+    """Builds the Stage-4 state. The claim precedes the evidence so context truncation can never drop it."""
+    evidence_text = "\n\n".join(f"[{r.chunk.doc_id}] {r.chunk.text}" for r in evidence_chunks)
+    return (
+        f"Query (untrusted user input): {_untrusted_inline(query)}\n\n"
+        f"Candidate Claim: {' '.join(claim_text.split())}\n\n"
+        f"Evidence:\n{evidence_text}"
+    )
+
+
+def build_relevance_state(query: str, chunk: RetrievedChunk) -> str:
+    return (
+        f"Query (untrusted user input): {_untrusted_inline(query)}\n\n"
+        f"Guideline Passage [{chunk.chunk.doc_id}]: {chunk.chunk.text}"
+    )
 
 
 class DecisionBackend(ABC):
-    """Abstract interface for System-1 typed decision engines."""
+    """
+    Abstract interface for System-1 typed decision engines.
+
+    The pipeline calls the three stage methods in order (`predict_triage` -> `predict_chunk_relevance`
+    -> `predict_claim`) so each stage only sees what has passed the previous gate, and the claim that is
+    verified is exactly the claim that will be served.
+    """
 
     backend_name: str = "abstract"
     checkpoint_id: str = "unknown"
+    # Approximate character budget (~4 chars/token) for Laya's 1,024-token typed-decisions context.
+    max_state_chars: int | None = 4000
 
     @abstractmethod
     def predict_raw(
@@ -232,18 +296,16 @@ class DecisionBackend(ABC):
     ) -> dict[str, Any]:
         """Executes a single-pass System-1 query over state and typed questions."""
 
-    def predict_case(
-        self,
-        case_record: dict[str, Any],
-        retrieved_chunks: list[RetrievedChunk] | None = None,
-    ) -> dict[str, Any]:
-        """
-        Produces the dictionary of System-1 probabilities required by Stages 1, 3, and 4.
-        Uses Laya 0.4.12-compliant schema keys ('criteria' for both choice and score questions).
-        """
-        query = str(case_record["query"])
-        rev_domains = list(reversed(CLINICAL_DOMAIN_OPTIONS))
+    def _predict_checked(self, state: str, questions: dict[str, dict[str, Any]]) -> dict[str, Any]:
+        if self.max_state_chars is not None and len(state) > self.max_state_chars:
+            raise StateTooLongError(
+                f"System-1 state is {len(state)} chars (> {self.max_state_chars}); refusing to risk silent truncation."
+            )
+        return self.predict_raw(state=state, questions=questions)
 
+    def predict_triage(self, case_record: dict[str, Any]) -> dict[str, Any]:
+        """Stage 1 signals: prompt attack noul, urgency score, and forward/reverse domain choice."""
+        query = _untrusted_inline(str(case_record["query"]))
         stage1_questions: dict[str, dict[str, Any]] = {
             "prompt_attack_or_unsafe": {
                 "type": "noul",
@@ -267,17 +329,26 @@ class DecisionBackend(ABC):
             "domain_rev": {
                 "type": "choice",
                 "instructions": "Select the primary clinical specialty domain for this query.",
-                "criteria": rev_domains,
+                "criteria": list(reversed(CLINICAL_DOMAIN_OPTIONS)),
             },
         }
-        s1_resp = self.predict_raw(state=query, questions=stage1_questions)
+        resp = self._predict_checked(state=query, questions=stage1_questions)
+        return {
+            "prompt_attack_or_unsafe": _extract_noul_prob(resp, "prompt_attack_or_unsafe"),
+            "clinical_urgency_probs": _extract_score_probs(resp, "clinical_urgency_probs"),
+            "domain_fwd": _extract_answer_distribution(resp, "domain_fwd", CLINICAL_DOMAIN_OPTIONS),
+            "domain_rev": _extract_answer_distribution(resp, "domain_rev", CLINICAL_DOMAIN_OPTIONS),
+        }
 
+    def predict_chunk_relevance(
+        self, case_record: dict[str, Any], chunks: list[RetrievedChunk]
+    ) -> dict[str, float]:
+        """Stage 3 signals: one relevance noul per retrieved passage (missing scores stay absent -> fail-closed gate)."""
+        query = str(case_record["query"])
         chunk_rel: dict[str, float] = {}
-        chunks = retrieved_chunks or []
         for item in chunks:
-            doc_id = item.chunk.doc_id
-            c_resp = self.predict_raw(
-                state=f"Query: {query}\n\nGuideline Passage [{doc_id}]: {item.chunk.text}",
+            resp = self._predict_checked(
+                state=build_relevance_state(query, item),
                 questions={
                     "rel": {
                         "type": "noul",
@@ -285,13 +356,21 @@ class DecisionBackend(ABC):
                     }
                 },
             )
-            chunk_rel[doc_id] = _extract_noul_prob(c_resp, "rel", default=0.0)
+            try:
+                chunk_rel[item.chunk.doc_id] = _extract_noul_prob(resp, "rel")
+            except MissingSignalError:
+                logger.warning("Missing relevance score for %s; passage will be rejected.", item.chunk.doc_id)
+        return chunk_rel
 
-        candidate_claim = str(case_record.get("candidate_claim", ""))
-        evidence_text = "\n\n".join(f"[{r.chunk.doc_id}] {r.chunk.text}" for r in chunks)
-        rev_claims = list(reversed(CLAIM_OPTIONS))
-        s4_resp = self.predict_raw(
-            state=f"Query: {query}\n\nEvidence:\n{evidence_text}\n\nCandidate Claim: {candidate_claim}",
+    def predict_claim(
+        self,
+        case_record: dict[str, Any],
+        claim_text: str,
+        evidence_chunks: list[RetrievedChunk],
+    ) -> dict[str, Any]:
+        """Stage 4 signals for exactly `claim_text` against exactly the accepted `evidence_chunks`."""
+        resp = self._predict_checked(
+            state=build_claim_state(str(case_record["query"]), claim_text, evidence_chunks),
             questions={
                 "claim_fwd": {
                     "type": "choice",
@@ -301,7 +380,7 @@ class DecisionBackend(ABC):
                 "claim_rev": {
                     "type": "choice",
                     "instructions": "Classify whether the candidate claim is supported, contradicted, or not_mentioned by the evidence.",
-                    "criteria": rev_claims,
+                    "criteria": list(reversed(CLAIM_OPTIONS)),
                 },
                 "guidelines_conflict_noul": {
                     "type": "noul",
@@ -309,17 +388,29 @@ class DecisionBackend(ABC):
                 },
             },
         )
-
         return {
-            "prompt_attack_or_unsafe": _extract_noul_prob(s1_resp, "prompt_attack_or_unsafe", 0.0),
-            "clinical_urgency_probs": _extract_score_probs(s1_resp, "clinical_urgency_probs"),
-            "domain_fwd": _extract_answer_distribution(s1_resp, "domain_fwd", CLINICAL_DOMAIN_OPTIONS),
-            "domain_rev": _extract_answer_distribution(s1_resp, "domain_rev", CLINICAL_DOMAIN_OPTIONS),
-            "chunk_relevance": chunk_rel,
-            "claim_fwd": _extract_answer_distribution(s4_resp, "claim_fwd", CLAIM_OPTIONS),
-            "claim_rev": _extract_answer_distribution(s4_resp, "claim_rev", CLAIM_OPTIONS),
-            "guidelines_conflict_noul": _extract_noul_prob(s4_resp, "guidelines_conflict_noul", 0.05),
+            "claim_fwd": _extract_answer_distribution(resp, "claim_fwd", CLAIM_OPTIONS),
+            "claim_rev": _extract_answer_distribution(resp, "claim_rev", CLAIM_OPTIONS),
+            "guidelines_conflict_noul": _extract_noul_prob(resp, "guidelines_conflict_noul"),
         }
+
+    def predict_case(
+        self,
+        case_record: dict[str, Any],
+        retrieved_chunks: list[RetrievedChunk] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Convenience wrapper returning all stage signals in one dictionary (Laya 0.4.12 schema keys).
+        Requires `case_record['candidate_claim']`; the pipeline itself uses the staged methods instead.
+        """
+        claim = case_record.get("candidate_claim")
+        if not claim:
+            raise ValueError("predict_case requires case_record['candidate_claim']; never verify an empty claim.")
+        chunks = retrieved_chunks or []
+        out = dict(self.predict_triage(case_record))
+        out["chunk_relevance"] = self.predict_chunk_relevance(case_record, chunks)
+        out.update(self.predict_claim(case_record, str(claim), chunks))
+        return out
 
 
 class LayaLocalBackend(DecisionBackend):
@@ -358,10 +449,14 @@ class LayaLocalBackend(DecisionBackend):
         return cast(dict[str, Any], raw_out)
 
 
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
 class SystemOneHTTPBackend(DecisionBackend):
     """
     HTTP client for `laya-serve` or commercial `/v1/systemone` (Jev-compatible) servers.
-    Fails closed by default if pointed at a non-local endpoint unless `allow_external_endpoint=True`.
+    Fails closed by default if pointed at a non-local endpoint unless `allow_external_endpoint=True`;
+    external endpoints must additionally use HTTPS.
     """
 
     def __init__(
@@ -373,13 +468,19 @@ class SystemOneHTTPBackend(DecisionBackend):
         allow_external_endpoint: bool = False,
     ) -> None:
         self.backend_name = "systemone-http"
-        self.checkpoint_id = f"{base_url.rstrip('/')}/v1/systemone"
         self.base_url = base_url.rstrip("/")
+        self.checkpoint_id = f"{self.base_url}/v1/systemone"
         self.api_key = api_key or os.environ.get("LAYA_API_KEY")
         self.timeout_s = timeout_s
         self.redact_phi = redact_phi
         self.allow_external_endpoint = allow_external_endpoint
-        is_local = any(h in self.base_url for h in ("localhost", "127.0.0.1"))
+        self._client: httpx.Client | None = None
+
+        parts = urlsplit(self.base_url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError(f"Invalid SystemOneHTTPBackend base_url '{self.base_url}'.")
+        # Compare the parsed hostname exactly: substring checks accept 'localhost.attacker.example'.
+        is_local = parts.hostname.lower() in _LOCAL_HOSTS
         if not is_local:
             if not self.allow_external_endpoint:
                 raise ValueError(
@@ -387,10 +488,31 @@ class SystemOneHTTPBackend(DecisionBackend):
                     "(fail-closed PHI guard). Pass allow_external_endpoint=True only after verifying "
                     "upstream HIPAA/GDPR clinical de-identification."
                 )
+            if parts.scheme != "https":
+                raise ValueError(
+                    f"Refusing external SystemOneHTTPBackend endpoint '{self.base_url}' without HTTPS "
+                    "(clinical text and API keys must not travel in plaintext)."
+                )
             logger.warning(
                 "SystemOneHTTPBackend initialized with external endpoint (%s).",
                 self.base_url,
             )
+
+    def _get_client(self) -> httpx.Client:
+        if self._client is None:
+            self._client = httpx.Client(timeout=self.timeout_s)
+        return self._client
+
+    def close(self) -> None:
+        if self._client is not None:
+            self._client.close()
+            self._client = None
+
+    def __enter__(self) -> SystemOneHTTPBackend:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
 
     def predict_raw(
         self,
@@ -404,17 +526,18 @@ class SystemOneHTTPBackend(DecisionBackend):
             headers["Authorization"] = f"Bearer {self.api_key}"
 
         payload = {"state": clean_state, "questions": norm_q}
-        with httpx.Client(timeout=self.timeout_s) as client:
-            resp = client.post(
-                f"{self.base_url}/v1/systemone", json=payload, headers=headers
-            )
-            resp.raise_for_status()
-            return cast(dict[str, Any], resp.json())
+        resp = self._get_client().post(f"{self.base_url}/v1/systemone", json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        if not isinstance(data, dict):
+            raise MissingSignalError("SystemOne response body is not a JSON object.")
+        return cast(dict[str, Any], data)
 
 
 class DeterministicEvalBackend(DecisionBackend):
     """
     Golden-fixture replay backend used for fast, 100% reproducible offline evaluation and CI testing.
+    Cases without `raw_model_probs` produce no answers, so every stage fails closed.
     """
 
     def __init__(self) -> None:
@@ -429,11 +552,39 @@ class DeterministicEvalBackend(DecisionBackend):
         norm_q = normalize_questions_dict(questions)
         return {"state": state, "questions": norm_q, "answers": {}}
 
-    def predict_case(
+    @staticmethod
+    def _fixture(case_record: dict[str, Any]) -> dict[str, Any] | None:
+        fixture = case_record.get("raw_model_probs")
+        return cast(dict[str, Any], fixture) if isinstance(fixture, dict) else None
+
+    def predict_triage(self, case_record: dict[str, Any]) -> dict[str, Any]:
+        fixture = self._fixture(case_record)
+        if fixture is None:
+            return super().predict_triage(case_record)
+        # Same fail-closed contract as live backends: the router would otherwise default P(attack) to 0.0.
+        missing = [k for k in _TRIAGE_SIGNALS if fixture.get(k) is None]
+        if missing:
+            raise MissingSignalError(f"Golden fixture is missing required Stage-1 signals: {missing}")
+        return dict(fixture)
+
+    def predict_chunk_relevance(
+        self, case_record: dict[str, Any], chunks: list[RetrievedChunk]
+    ) -> dict[str, float]:
+        fixture = self._fixture(case_record)
+        if fixture is None:
+            return super().predict_chunk_relevance(case_record, chunks)
+        return dict(fixture.get("chunk_relevance", {}))
+
+    def predict_claim(
         self,
         case_record: dict[str, Any],
-        retrieved_chunks: list[RetrievedChunk] | None = None,
+        claim_text: str,
+        evidence_chunks: list[RetrievedChunk],
     ) -> dict[str, Any]:
-        if "raw_model_probs" in case_record:
-            return cast(dict[str, Any], case_record["raw_model_probs"])
-        return super().predict_case(case_record, retrieved_chunks=retrieved_chunks)
+        fixture = self._fixture(case_record)
+        if fixture is None:
+            return super().predict_claim(case_record, claim_text, evidence_chunks)
+        if claim_text != case_record.get("candidate_claim"):
+            # Fixture probabilities were recorded for the fixture claim only; never reuse them for another text.
+            raise MissingSignalError("Golden fixture has no claim verification signals for a non-fixture claim.")
+        return dict(fixture)

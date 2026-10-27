@@ -19,9 +19,14 @@ def _tokenize(text: str) -> list[str]:
 
 
 class HybridClinicalRetriever:
-    """Combines lexical BM25Okapi with L2-normalized IDF vector cosine similarity via RRF."""
+    """
+    Combines lexical BM25Okapi with L2-normalized TF-IDF cosine similarity via RRF.
+    Note: `dense_score` / `dense_rank` hold the sparse TF-IDF cosine signal (no neural embeddings).
+    """
 
     def __init__(self, chunks: list[ClinicalChunk], rrf_k: int = 60) -> None:
+        if not chunks:
+            raise ValueError("HybridClinicalRetriever requires at least one guideline chunk.")
         self.chunks = chunks
         self.rrf_k = rrf_k
         self._tokenized = [_tokenize(f"{c.title} {c.text}") for c in chunks]

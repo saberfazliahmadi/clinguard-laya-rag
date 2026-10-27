@@ -15,7 +15,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.03, "endocrine_diabetes": 0.22, "renal_dosing_contraindications": 0.71, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.03, "cardiovascular_hypertension": 0.03, "endocrine_diabetes": 0.24, "renal_dosing_contraindications": 0.68, "out_of_scope": 0.02},
       "chunk_relevance": {"KDIGO-2024-MET-01": 0.96, "HARDNEG-MET-HEP-02": 0.18},
-      "guidelines_conflict": 0.08,
+      "guidelines_conflict_noul": 0.08,
       "claim_fwd": {"supported": 0.94, "contradicted": 0.03, "not_mentioned": 0.03},
       "claim_rev": {"supported": 0.92, "contradicted": 0.04, "not_mentioned": 0.04}
     }
@@ -36,7 +36,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.91, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.03, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.89, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.03, "renal_dosing_contraindications": 0.04, "out_of_scope": 0.02},
       "chunk_relevance": {"WHO-AWARE-CAP-01": 0.95, "HARDNEG-PED-CAP-02": 0.14},
-      "guidelines_conflict": 0.06,
+      "guidelines_conflict_noul": 0.06,
       "claim_fwd": {"supported": 0.95, "contradicted": 0.02, "not_mentioned": 0.03},
       "claim_rev": {"supported": 0.93, "contradicted": 0.03, "not_mentioned": 0.04}
     }
@@ -57,7 +57,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.25, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.69, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.27, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.67, "out_of_scope": 0.02},
       "chunk_relevance": {"RENAL-APX-2024-01": 0.94},
-      "guidelines_conflict": 0.05,
+      "guidelines_conflict_noul": 0.05,
       "claim_fwd": {"supported": 0.18, "contradicted": 0.76, "not_mentioned": 0.06},
       "claim_rev": {"supported": 0.14, "contradicted": 0.79, "not_mentioned": 0.07}
     }
@@ -78,7 +78,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.58, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.36, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.54, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.40, "out_of_scope": 0.02},
       "chunk_relevance": {"WHO-AWARE-UTI-01": 0.93},
-      "guidelines_conflict": 0.07,
+      "guidelines_conflict_noul": 0.07,
       "claim_fwd": {"supported": 0.82, "contradicted": 0.13, "not_mentioned": 0.05},
       "claim_rev": {"supported": 0.15, "contradicted": 0.80, "not_mentioned": 0.05}
     }
@@ -99,7 +99,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.82, "cardiovascular_hypertension": 0.04, "endocrine_diabetes": 0.04, "renal_dosing_contraindications": 0.06, "out_of_scope": 0.04},
       "domain_rev": {"antimicrobial_stewardship": 0.80, "cardiovascular_hypertension": 0.04, "endocrine_diabetes": 0.04, "renal_dosing_contraindications": 0.08, "out_of_scope": 0.04},
       "chunk_relevance": {"WHO-AWARE-CAP-01": 0.22, "WHO-AWARE-UTI-01": 0.19},
-      "guidelines_conflict": 0.05,
+      "guidelines_conflict_noul": 0.05,
       "claim_fwd": {"supported": 0.78, "contradicted": 0.04, "not_mentioned": 0.18},
       "claim_rev": {"supported": 0.12, "contradicted": 0.06, "not_mentioned": 0.82}
     }
@@ -120,7 +120,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.90, "endocrine_diabetes": 0.03, "renal_dosing_contraindications": 0.03, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.88, "endocrine_diabetes": 0.04, "renal_dosing_contraindications": 0.04, "out_of_scope": 0.02},
       "chunk_relevance": {"AHA-HTN-2023-BP01": 0.95, "ESC-HTN-2024-ELDERLY": 0.35},
-      "guidelines_conflict": 0.12,
+      "guidelines_conflict_noul": 0.12,
       "claim_fwd": {"supported": 0.94, "contradicted": 0.03, "not_mentioned": 0.03},
       "claim_rev": {"supported": 0.92, "contradicted": 0.04, "not_mentioned": 0.04}
     }
@@ -141,7 +141,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.31, "renal_dosing_contraindications": 0.63, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.33, "renal_dosing_contraindications": 0.61, "out_of_scope": 0.02},
       "chunk_relevance": {"KDIGO-2024-MET-01": 0.96, "HARDNEG-MET-HEP-02": 0.16},
-      "guidelines_conflict": 0.07,
+      "guidelines_conflict_noul": 0.07,
       "claim_fwd": {"supported": 0.95, "contradicted": 0.02, "not_mentioned": 0.03},
       "claim_rev": {"supported": 0.93, "contradicted": 0.03, "not_mentioned": 0.04}
     }
@@ -162,7 +162,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.92, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.02, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.90, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.04, "out_of_scope": 0.02},
       "chunk_relevance": {"WHO-AWARE-CAP-01": 0.94, "HARDNEG-PED-CAP-02": 0.21},
-      "guidelines_conflict": 0.09,
+      "guidelines_conflict_noul": 0.09,
       "claim_fwd": {"supported": 0.94, "contradicted": 0.03, "not_mentioned": 0.03},
       "claim_rev": {"supported": 0.92, "contradicted": 0.04, "not_mentioned": 0.04}
     }
@@ -183,7 +183,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.08, "endocrine_diabetes": 0.48, "renal_dosing_contraindications": 0.40, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.08, "endocrine_diabetes": 0.46, "renal_dosing_contraindications": 0.42, "out_of_scope": 0.02},
       "chunk_relevance": {"ADA-2025-SGLT2-HF": 0.95, "FDA-LEGACY-SGLT2-2019": 0.84},
-      "guidelines_conflict": 0.82,
+      "guidelines_conflict_noul": 0.82,
       "claim_fwd": {"supported": 0.93, "contradicted": 0.04, "not_mentioned": 0.03},
       "claim_rev": {"supported": 0.91, "contradicted": 0.05, "not_mentioned": 0.04}
     }
@@ -204,7 +204,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.76, "endocrine_diabetes": 0.10, "renal_dosing_contraindications": 0.10, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.74, "endocrine_diabetes": 0.11, "renal_dosing_contraindications": 0.11, "out_of_scope": 0.02},
       "chunk_relevance": {"AHA-HTN-2023-BP01": 0.92},
-      "guidelines_conflict": 0.06,
+      "guidelines_conflict_noul": 0.06,
       "claim_fwd": {"supported": 0.78, "contradicted": 0.16, "not_mentioned": 0.06},
       "claim_rev": {"supported": 0.14, "contradicted": 0.80, "not_mentioned": 0.06}
     }
@@ -225,7 +225,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.88, "cardiovascular_hypertension": 0.03, "endocrine_diabetes": 0.03, "renal_dosing_contraindications": 0.04, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.86, "cardiovascular_hypertension": 0.03, "endocrine_diabetes": 0.03, "renal_dosing_contraindications": 0.06, "out_of_scope": 0.02},
       "chunk_relevance": {"WHO-AWARE-CAP-01": 0.24, "HARDNEG-PED-CAP-02": 0.15},
-      "guidelines_conflict": 0.04,
+      "guidelines_conflict_noul": 0.04,
       "claim_fwd": {"supported": 0.91, "contradicted": 0.04, "not_mentioned": 0.05},
       "claim_rev": {"supported": 0.89, "contradicted": 0.05, "not_mentioned": 0.06}
     }
@@ -246,7 +246,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.03, "cardiovascular_hypertension": 0.03, "endocrine_diabetes": 0.03, "renal_dosing_contraindications": 0.23, "out_of_scope": 0.68},
       "domain_rev": {"antimicrobial_stewardship": 0.03, "cardiovascular_hypertension": 0.03, "endocrine_diabetes": 0.03, "renal_dosing_contraindications": 0.25, "out_of_scope": 0.66},
       "chunk_relevance": {"RENAL-APX-2024-01": 0.30},
-      "guidelines_conflict": 0.05,
+      "guidelines_conflict_noul": 0.05,
       "claim_fwd": {"supported": 0.04, "contradicted": 0.92, "not_mentioned": 0.04},
       "claim_rev": {"supported": 0.05, "contradicted": 0.90, "not_mentioned": 0.05}
     }
@@ -267,7 +267,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.28, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.66, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.30, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.64, "out_of_scope": 0.02},
       "chunk_relevance": {"RENAL-APX-2024-01": 0.97},
-      "guidelines_conflict": 0.04,
+      "guidelines_conflict_noul": 0.04,
       "claim_fwd": {"supported": 0.95, "contradicted": 0.03, "not_mentioned": 0.02},
       "claim_rev": {"supported": 0.94, "contradicted": 0.03, "not_mentioned": 0.03}
     }
@@ -288,7 +288,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.72, "cardiovascular_hypertension": 0.18, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.04, "out_of_scope": 0.04},
       "domain_rev": {"antimicrobial_stewardship": 0.70, "cardiovascular_hypertension": 0.20, "endocrine_diabetes": 0.02, "renal_dosing_contraindications": 0.04, "out_of_scope": 0.04},
       "chunk_relevance": {"WHO-AWARE-CAP-01": 0.45},
-      "guidelines_conflict": 0.05,
+      "guidelines_conflict_noul": 0.05,
       "claim_fwd": {"supported": 0.20, "contradicted": 0.10, "not_mentioned": 0.70},
       "claim_rev": {"supported": 0.18, "contradicted": 0.10, "not_mentioned": 0.72}
     }
@@ -309,7 +309,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.28, "renal_dosing_contraindications": 0.66, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.02, "endocrine_diabetes": 0.30, "renal_dosing_contraindications": 0.64, "out_of_scope": 0.02},
       "chunk_relevance": {"KDIGO-2024-MET-01": 0.91, "HARDNEG-MET-HEP-02": 0.15},
-      "guidelines_conflict": 0.05,
+      "guidelines_conflict_noul": 0.05,
       "claim_fwd": {"supported": 0.78, "contradicted": 0.10, "not_mentioned": 0.12},
       "claim_rev": {"supported": 0.74, "contradicted": 0.12, "not_mentioned": 0.14}
     }
@@ -330,7 +330,7 @@
       "domain_fwd": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.91, "endocrine_diabetes": 0.03, "renal_dosing_contraindications": 0.02, "out_of_scope": 0.02},
       "domain_rev": {"antimicrobial_stewardship": 0.02, "cardiovascular_hypertension": 0.89, "endocrine_diabetes": 0.03, "renal_dosing_contraindications": 0.04, "out_of_scope": 0.02},
       "chunk_relevance": {"ESC-HTN-2024-ELDERLY": 0.96, "AHA-HTN-2023-BP01": 0.38},
-      "guidelines_conflict": 0.14,
+      "guidelines_conflict_noul": 0.14,
       "claim_fwd": {"supported": 0.94, "contradicted": 0.03, "not_mentioned": 0.03},
       "claim_rev": {"supported": 0.92, "contradicted": 0.04, "not_mentioned": 0.04}
     }

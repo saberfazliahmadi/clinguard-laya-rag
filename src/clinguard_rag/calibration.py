@@ -23,6 +23,8 @@ def apply_temperature_to_distribution(
     """Applies temperature scaling T > 0 to a categorical probability dictionary."""
     if temperature <= 0:
         raise ValueError("Temperature must be strictly positive.")
+    if not probs:
+        return {}
     eps = 1e-8
     keys = list(probs.keys())
     p_arr = np.clip(np.array([probs[k] for k in keys], dtype=np.float64), eps, 1.0)
@@ -82,6 +84,8 @@ class TemperatureCalibrator:
         self.temperature: float = target_temp
 
     def fit(self, distributions: list[dict[str, float]], true_labels: list[str]) -> float:
+        if not distributions or len(distributions) != len(true_labels):
+            raise ValueError("fit() requires a non-empty, equal-length list of distributions and labels.")
         best_t = 1.0
         best_nll = float("inf")
         eps = 1e-8
