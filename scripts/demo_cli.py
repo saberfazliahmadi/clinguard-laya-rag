@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from clinguard_rag.pipeline import ClinGuardPipeline
+from clinguard_rag.pipeline import VALID_MODES, ClinGuardPipeline
 from clinguard_rag.retriever import HybridClinicalRetriever
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +19,7 @@ def main() -> None:
         "--mode",
         type=str,
         default="clinguard_full",
-        choices=["baseline", "raw_system1", "debiased_system1", "clinguard_full"],
+        choices=list(VALID_MODES),
     )
     args = parser.parse_args()
 
@@ -27,11 +27,14 @@ def main() -> None:
     cases = json.loads((ROOT / "data" / "evaluation_benchmark.json").read_text(encoding="utf-8"))
     cal_cases = [c for c in cases if c["split"] == "calibration"]
 
+    target = next((c for c in cases if c["case_id"] == args.case_id), None)
+    if target is None:
+        parser.error(f"Unknown --case-id '{args.case_id}'. Available: {', '.join(c['case_id'] for c in cases)}")
+
     pipeline = ClinGuardPipeline(retriever=retriever, mode=args.mode)
-    if args.mode == "clinguard_full":
+    if args.mode in ("clinguard_full", "retrieval_baseline"):
         pipeline.fit_calibration(cal_cases)
 
-    target = next((c for c in cases if c["case_id"] == args.case_id), cases[0])
     audit = pipeline.run_case(target)
     print(json.dumps(audit.model_dump(mode="json"), indent=2))
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,7 @@ from clinguard_rag.calibration import (
     compute_ece_and_brier,
 )
 from clinguard_rag.debiasing import combine_bidirectional_probabilities
-from clinguard_rag.pipeline import ClinGuardPipeline
+from clinguard_rag.pipeline import ClinGuardPipeline, PipelineMode
 from clinguard_rag.retriever import HybridClinicalRetriever
 from clinguard_rag.schemas import ClinicalDisposition
 from clinguard_rag.verifier import CLAIM_VERIFICATION_OPTIONS_3WAY
@@ -83,7 +84,7 @@ def run_benchmark() -> dict[str, Any]:
     cal_cases = [c for c in cases if c["split"] == "calibration"]
     test_cases = [c for c in cases if c["split"] == "test"]
 
-    modes = ["baseline", "retrieval_baseline", "raw_system1", "debiased_system1", "clinguard_full"]
+    modes: list[PipelineMode] = ["baseline", "retrieval_baseline", "raw_system1", "debiased_system1", "clinguard_full"]
     summary: dict[str, Any] = {}
 
     for mode in modes:
@@ -120,20 +121,24 @@ def run_benchmark() -> dict[str, Any]:
                 }
             )
 
-        cal_metrics = (
-            {
+        # Neither baseline consults the System-1 claim judge, so calibration metrics do not apply to them.
+        cal_metrics: dict[str, float | None]
+        if mode in ("baseline", "retrieval_baseline"):
+            cal_metrics = {
                 "claim_argmax_accuracy": None,
                 "ece_10bin": None,
                 "brier_score": None,
                 "multiclass_nll": None,
             }
-            if mode == "baseline"
-            else evaluate_claim_judge_calibration(
-                test_cases=test_cases,
-                temperature=fitted_t,
-                use_bidirectional_debiasing=mode in ("debiased_system1", "clinguard_full"),
+        else:
+            cal_metrics = dict(
+                evaluate_claim_judge_calibration(
+                    test_cases=test_cases,
+                    temperature=fitted_t,
+                    use_bidirectional_debiasing=mode in ("debiased_system1", "clinguard_full"),
+                )
             )
-        )
+        cal_metrics["top_label_brier_score"] = cal_metrics["brier_score"]
 
         summary[mode] = {
             "temperature": fitted_t,
@@ -146,27 +151,16 @@ def run_benchmark() -> dict[str, Any]:
     return summary
 
 
-_orig_run_benchmark = run_benchmark
-
-
-def run_benchmark():
-    summary = _orig_run_benchmark()
-    for _mode_key, metrics in summary.items():
-        if _mode_key == "retrieval_baseline" and isinstance(metrics, dict):
-            metrics["claim_argmax_accuracy"] = None
-            metrics["ece_10bin"] = None
-            metrics["brier_score"] = None
-            metrics["top_label_brier_score"] = None
-            metrics["multiclass_nll"] = None
-        elif isinstance(metrics, dict) and "brier_score" in metrics:
-            metrics["top_label_brier_score"] = metrics["brier_score"]
-    return summary
+def main() -> int:
+    results = run_benchmark()
+    print(json.dumps(results, indent=2))
+    full = results["clinguard_full"]
+    # Explicit checks (not `assert`) so the CI gate still runs under `python -O`.
+    if full["unsafe_claim_leakage_rate"] != 0.0 or full["disposition_accuracy"] != 1.0:
+        print("Benchmark regression: clinguard_full must serve no unsafe claims on the golden fixtures.", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    import json
-
-    results = run_benchmark()
-    print(json.dumps(results, indent=2))
-    assert results["clinguard_full"]["disposition_accuracy"] == 1.0
-    assert results["clinguard_full"]["unsafe_claim_leakage_rate"] == 0.0
+    sys.exit(main())
