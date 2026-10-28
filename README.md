@@ -1,14 +1,11 @@
 ![ClinGuard RAG cover](images/clinguard-rag-cover.png)
 <p align="center">
-🎥 Watch the ClinGuard RAG project overview on YouTube
+  <a href="https://www.youtube.com/watch?v=H70mOj-KEeo"><strong>🎥▶ By Clicking Here Watch this Project Overview on YouTube to Understand it Easily & Quickly :)</strong></a>
 </p>
 <p align="center">
   <a href="https://www.youtube.com/watch?v=H70mOj-KEeo">
     <img src="https://img.youtube.com/vi/H70mOj-KEeo/hqdefault.jpg" alt="Watch the ClinGuard RAG project overview on YouTube" width="560">
   </a>
-</p>
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=H70mOj-KEeo"><strong>🎥▶ Watch this Project Overview on YouTube to Understand it Easily & Quickly :)</strong></a>
 </p>
 
 ![ClinGuard RAG 5-stage decision layer](images/ClinGuard-RAG_5-Stage_Decision_Layer.png)
