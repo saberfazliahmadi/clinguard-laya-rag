@@ -1,4 +1,4 @@
-![ClinGuard RAG 5-stage decision layer](images/ClinGuard-RAG (clinguard-laya-rag).png)
+![ClinGuard RAG 5-stage decision layer](images/clinguard-rag-cover.png)
 <p align="center">
 🎥 Watch the ClinGuard RAG project overview on YouTube
 </p>
