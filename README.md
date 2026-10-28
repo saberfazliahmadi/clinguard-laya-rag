@@ -1,7 +1,7 @@
 ![ClinGuard RAG cover](images/clinguard-rag-cover.png)
 
 <p align="center">
-  <strong>🎥▶ Watch this Project Overview to Understand it Easily & Quickly :)</strong> </a>
+  <strong>🎥▶ Watch this Project Overview to Understand it Easily & Quickly :)</strong>
 </p>
 
 https://github.com/user-attachments/assets/bc322a54-3fb1-4751-9aba-44ae33676dac

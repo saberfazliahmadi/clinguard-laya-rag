@@ -29,3 +29,6 @@ hf_cache/
 .env
 .env.*
 .offline-markdown-preview/
+
+# Video files (embed via GitHub user-attachments instead of committing)
+*.mp4
