@@ -1,11 +1,11 @@
 ![ClinGuard RAG cover](images/clinguard-rag-cover.png)
 
 <p align="center">
-  <strong>🎥▶ Watch this Project Overview to Understand it Easily & Quickly :)</strong></em>
+  <strong>🎥▶ Watch this Project Overview to Understand it Easily & Quickly :)</strong>
 </p>
 
 <p align="center">
-  </strong>🔊 <em>click the speaker icon on video player to unmute</em>
+  🔊 <em>click the speaker icon on video player to unmute</em>
 </p>
 
 https://github.com/user-attachments/assets/bc322a54-3fb1-4751-9aba-44ae33676dac
