@@ -1,10 +1,10 @@
 ![ClinGuard RAG cover](images/clinguard-rag-cover.png)
 
-https://github.com/user-attachments/assets/bc322a54-3fb1-4751-9aba-44ae33676dac
-
 <p align="center">
   <strong>🎥▶ Watch this Project Overview to Understand it Easily & Quickly :)</strong> </a>
 </p>
+
+https://github.com/user-attachments/assets/bc322a54-3fb1-4751-9aba-44ae33676dac
 
 ![ClinGuard RAG 5-stage decision layer](images/ClinGuard-RAG_5-Stage_Decision_Layer.png)
 
