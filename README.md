@@ -1,6 +1,6 @@
 ![ClinGuard RAG cover](images/clinguard-rag-cover.png)
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=H70mOj-KEeo" target="_blank"><strong>🎥▶ By Clicking Here Watch this Project Overview on YouTube to Understand it Easily & Quickly :)</strong></a>
+  <a href="https://www.youtube.com/watch?v=H70mOj-KEeo" target="_blank"><strong>🎥▶ By Clicking Here Watch this Project Overview on YouTube to Understand it Easily & Quickly :)</strong> <em>(Ctrl/Cmd+click to open in a new tab)</em></a>
 </p>
 <p align="center">
   <a href="https://www.youtube.com/watch?v=H70mOj-KEeo">
